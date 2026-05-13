@@ -1,0 +1,60 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "Promethaion API",
+    "description": "Self-aware pattern recognition engine for historical data analysis. Combines FastForest, SDCA, and LightGBM pipelines in a weighted ensemble.",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/Harvester/sync/full": {
+      "post": {
+        "tags": [
+          "Harvester"
+        ],
+        "parameters": [
+          {
+            "name": "gameName",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "SA Lotto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Harvester/sync/latest": {
+      "post": {
+        "tags": [
+          "Harvester"
+        ],
+        "parameters": [
+          {
+            "name": "gameName",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "SA Lotto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": { },
+  "tags": [
+    {
+      "name": "Harvester"
+    }
+  ]
+}

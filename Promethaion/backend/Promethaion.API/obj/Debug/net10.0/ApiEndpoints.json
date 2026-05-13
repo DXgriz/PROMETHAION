@@ -1,0 +1,34 @@
+[
+  {
+    "ContainingType": "Promethaion.API.Controllers.HarvesterController",
+    "Method": "FullSync",
+    "RelativePath": "api/Harvester/sync/full",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "gameName",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.HarvesterController",
+    "Method": "LatestSync",
+    "RelativePath": "api/Harvester/sync/latest",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "gameName",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  }
+]

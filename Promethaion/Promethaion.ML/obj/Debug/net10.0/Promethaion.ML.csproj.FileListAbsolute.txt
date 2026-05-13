@@ -1,0 +1,16 @@
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\bin\Debug\net10.0\Promethaion.ML.deps.json
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\bin\Debug\net10.0\Promethaion.ML.dll
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\bin\Debug\net10.0\Promethaion.ML.pdb
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\bin\Debug\net10.0\Promethaion.Core.dll
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\bin\Debug\net10.0\Promethaion.Core.pdb
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Promethaion.ML.csproj.AssemblyReference.cache
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Promethaion.ML.GeneratedMSBuildEditorConfig.editorconfig
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Promethaion.ML.AssemblyInfoInputs.cache
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Promethaion.ML.AssemblyInfo.cs
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Promethaion.ML.csproj.CoreCompileInputs.cache
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Promethaion.ML.sourcelink.json
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Prometha.F60BDFAD.Up2Date
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Promethaion.ML.dll
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\refint\Promethaion.ML.dll
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\Promethaion.ML.pdb
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.ML\obj\Debug\net10.0\ref\Promethaion.ML.dll

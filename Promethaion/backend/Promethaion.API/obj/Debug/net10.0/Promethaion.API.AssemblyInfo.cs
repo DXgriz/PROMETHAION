@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Promethaion.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1ccf238cf4e69780a5951ee45b90626410870eba")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0502916774f0330dda4d3873aea6f4c2bc47065b")]
 [assembly: System.Reflection.AssemblyProductAttribute("Promethaion.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Promethaion.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -1,5 +1,11 @@
 <Solution>
   <Folder Name="/backend/">
     <Project Path="backend/Promethaion.API/Promethaion.API.csproj" />
+    <Project Path="Promethaion.Core/Promethaion.Core.csproj" Id="dba4db7c-b388-4b38-857c-ef623f84be03" />
+    <Project Path="Promethaion.Data/Promethaion.Data.csproj" Id="12c18bab-03c8-475a-98df-668278d0d377" />
+    <Project Path="Promethaion.ML/Promethaion.ML.csproj" Id="193e14ca-ae56-4161-bcc9-5be7b906c940" />
+  </Folder>
+  <Folder Name="/Frontend/">
+    <Project Path="Promethaion.Web/Promethaion.Web.csproj" Id="4e0751fb-6744-48e8-b142-ad9a0d4408bf" />
   </Folder>
 </Solution>

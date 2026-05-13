@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <Import Project="$(NuGetPackageRoot)microsoft.ml\5.0.0\build\netstandard2.0\Microsoft.ML.targets" Condition="Exists('$(NuGetPackageRoot)microsoft.ml\5.0.0\build\netstandard2.0\Microsoft.ML.targets')" />
+    <Import Project="$(NuGetPackageRoot)lightgbm\4.6.0\build\LightGBM.targets" Condition="Exists('$(NuGetPackageRoot)lightgbm\4.6.0\build\LightGBM.targets')" />
+    <Import Project="$(NuGetPackageRoot)microsoft.extensions.options\10.0.8\buildTransitive\net8.0\Microsoft.Extensions.Options.targets" Condition="Exists('$(NuGetPackageRoot)microsoft.extensions.options\10.0.8\buildTransitive\net8.0\Microsoft.Extensions.Options.targets')" />
+    <Import Project="$(NuGetPackageRoot)microsoft.extensions.logging.abstractions\10.0.8\buildTransitive\net8.0\Microsoft.Extensions.Logging.Abstractions.targets" Condition="Exists('$(NuGetPackageRoot)microsoft.extensions.logging.abstractions\10.0.8\buildTransitive\net8.0\Microsoft.Extensions.Logging.Abstractions.targets')" />
+  </ImportGroup>
+</Project>

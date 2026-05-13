@@ -1,0 +1,61 @@
+﻿@inherits LayoutComponentBase
+@inject IPromethaionApiClient Api
+@using Promethaion.Web.Services
+
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-logo">PROMETH<span class="ai">AI</span>ON</div>
+            <div class="brand-tagline">Autonomous Intelligence</div>
+        </div>
+
+        <nav class="nav-section">
+            <div class="nav-section-label">Core</div>
+            <NavLink class="nav-link" href="/dashboard" Match="NavLinkMatch.All">
+                <span class="nav-icon">◈</span> Dashboard
+            </NavLink>
+            <NavLink class="nav-link" href="/forecasts">
+                <span class="nav-icon">◎</span> Forecasts
+            </NavLink>
+        </nav>
+
+        <nav class="nav-section">
+            <div class="nav-section-label">Data</div>
+            <NavLink class="nav-link" href="/events">
+                <span class="nav-icon">≡</span> Pattern Events
+            </NavLink>
+        </nav>
+
+        <nav class="nav-section">
+            <div class="nav-section-label">System</div>
+            <NavLink class="nav-link" href="/intelligence">
+                <span class="nav-icon">⬡</span> Intelligence
+            </NavLink>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div style="font-size:11px; color:var(--text-dim);">
+                <span class="status-dot @(_apiOnline ? "online" : "offline")"></span>
+                API @(_apiOnline ? "Online" : "Offline")
+            </div>
+        </div>
+    </aside>
+
+    <div class="main-content">
+        @Body
+    </div>
+</div>
+
+@code {
+    private bool _apiOnline = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var status = await Api.GetSystemStatusAsync();
+            _apiOnline = status is not null;
+        }
+        catch { _apiOnline = false; }
+    }
+}

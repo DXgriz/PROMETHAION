@@ -1,0 +1,12 @@
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\bin\Debug\net10.0\Promethaion.Core.deps.json
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\bin\Debug\net10.0\Promethaion.Core.dll
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\bin\Debug\net10.0\Promethaion.Core.pdb
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\Promethaion.Core.GeneratedMSBuildEditorConfig.editorconfig
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\Promethaion.Core.AssemblyInfoInputs.cache
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\Promethaion.Core.AssemblyInfo.cs
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\Promethaion.Core.csproj.CoreCompileInputs.cache
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\Promethaion.Core.sourcelink.json
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\Promethaion.Core.dll
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\refint\Promethaion.Core.dll
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\Promethaion.Core.pdb
+G:\MyProjects\Future Ideas\PROMETHAION\PROMETHAION\Promethaion\Promethaion.Core\obj\Debug\net10.0\ref\Promethaion.Core.dll

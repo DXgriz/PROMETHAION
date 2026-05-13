@@ -1,0 +1,19 @@
+﻿@using Blazored.Toast
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not Found — Promethaion</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="page-body">
+                <div class="empty-state">
+                    <div class="empty-icon">◈</div>
+                    <p>Page not found.</p>
+                </div>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>
+<BlazoredToasts Position="Blazored.Toast.Configuration.ToastPosition.BottomRight" />

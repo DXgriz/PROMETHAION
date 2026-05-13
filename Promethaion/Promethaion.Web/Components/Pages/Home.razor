@@ -1,0 +1,575 @@
+﻿@page "/"
+@inject NavigationManager Nav
+
+<PageTitle>Promethaion — Where Intelligence Learns the Patterns of Reality</PageTitle>
+
+<nav class="lp-nav">
+    <div class="lp-brand">P<span>AI</span></div>
+    <div class="lp-nav-links">
+        <a href="#features">Features</a>
+        <a href="#pipelines">Pipelines</a>
+        <a href="#intelligence">Intelligence</a>
+    </div>
+    <div class="lp-nav-actions">
+        <a href="/login" class="lp-btn lp-btn-outline">Sign in</a>
+        <a href="/dashboard" class="lp-btn lp-btn-primary">Get started</a>
+    </div>
+</nav>
+
+<section class="lp-hero">
+    <div class="lp-eyebrow">The future of <span>autonomous intelligence</span></div>
+    <h1 class="lp-hero-title">
+        Where intelligence learns<br />the <span>patterns</span> of reality.
+    </h1>
+    <p class="lp-hero-sub">
+        Promethaion is a self-aware machine learning engine that discovers hidden
+        patterns in any system — trained, evaluated and retrained automatically.
+    </p>
+    <div class="lp-hero-actions">
+        <a href="/dashboard" class="lp-btn lp-btn-primary lp-btn-lg">Open Dashboard →</a>
+        <a href="#pipelines" class="lp-btn lp-btn-outline lp-btn-lg">View Pipelines</a>
+    </div>
+    <div class="lp-hero-stats">
+        <div class="lp-hstat">
+            <div class="lp-hstat-val">3</div>
+            <div class="lp-hstat-lbl">ML Pipelines</div>
+        </div>
+        <div class="lp-hstat">
+            <div class="lp-hstat-val">25+</div>
+            <div class="lp-hstat-lbl">Years of Data</div>
+        </div>
+        <div class="lp-hstat">
+            <div class="lp-hstat-val">Auto</div>
+            <div class="lp-hstat-lbl">Self-Retraining</div>
+        </div>
+        <div class="lp-hstat">
+            <div class="lp-hstat-val">∞</div>
+            <div class="lp-hstat-lbl">Extendable Systems</div>
+        </div>
+    </div>
+</section>
+
+<section class="lp-section" id="features">
+    <div class="lp-section-header">
+        <div class="lp-section-label">Core capabilities</div>
+        <h2 class="lp-section-title">Built to learn. Built to adapt.</h2>
+        <p class="lp-section-sub">
+            Every component is designed around one principle — the system should
+            understand itself and improve without human intervention.
+        </p>
+    </div>
+    <div class="lp-features-grid">
+        <div class="lp-feat-card">
+            <div class="lp-feat-icon lp-icon-warning">⬡</div>
+            <div class="lp-feat-title">Ensemble Intelligence</div>
+            <p class="lp-feat-desc">Three ML pipelines — FastForest, SDCA, and LightGBM — combined via weighted voting for higher accuracy than any single model.</p>
+        </div>
+        <div class="lp-feat-card">
+            <div class="lp-feat-icon lp-icon-blue">◎</div>
+            <div class="lp-feat-title">Self-Awareness Loop</div>
+            <p class="lp-feat-desc">Continuously evaluates its own predictions, tracks rolling accuracy, and triggers retraining automatically when performance drifts.</p>
+        </div>
+        <div class="lp-feat-card">
+            <div class="lp-feat-icon lp-icon-green">◈</div>
+            <div class="lp-feat-title">Live Data Harvesting</div>
+            <p class="lp-feat-desc">Automatically scrapes and normalises draw results every Wednesday and Saturday, keeping the training set current without manual effort.</p>
+        </div>
+        <div class="lp-feat-card">
+            <div class="lp-feat-icon lp-icon-warning">≋</div>
+            <div class="lp-feat-title">Feature Engineering</div>
+            <p class="lp-feat-desc">14 computed features per event — frequency windows, gap analysis, positional bias and co-occurrence pairs — extracted automatically at train time.</p>
+        </div>
+        <div class="lp-feat-card">
+            <div class="lp-feat-icon lp-icon-blue">⊕</div>
+            <div class="lp-feat-title">Domain-Agnostic</div>
+            <p class="lp-feat-desc">The entire pipeline framework is system-neutral. Swap in a new domain — stocks, weather, sports — by implementing one interface.</p>
+        </div>
+        <div class="lp-feat-card">
+            <div class="lp-feat-icon lp-icon-green">⟳</div>
+            <div class="lp-feat-title">Real-Time Updates</div>
+            <p class="lp-feat-desc">SignalR hub broadcasts training progress, pipeline metrics and new forecasts live to the dashboard as they happen.</p>
+        </div>
+    </div>
+</section>
+
+<section class="lp-section lp-section-alt" id="pipelines">
+    <div class="lp-section-header">
+        <div class="lp-section-label">ML Architecture</div>
+        <h2 class="lp-section-title">Three pipelines, one ensemble.</h2>
+    </div>
+    <div class="lp-pipeline-grid">
+        <div class="lp-pipe-card">
+            <div class="lp-pipe-tag lp-tag-warning">Frequency</div>
+            <div class="lp-pipe-name">FastForest Regression</div>
+            <p class="lp-pipe-desc">Models hot/cold distribution, rolling frequency windows across 10, 20 and 52 draw horizons, and gap-since-last-seen overdue detection.</p>
+            <div class="lp-pipe-trainer">Microsoft.ML.FastTree</div>
+        </div>
+        <div class="lp-pipe-card">
+            <div class="lp-pipe-tag lp-tag-blue">Sequence</div>
+            <div class="lp-pipe-name">SDCA Logistic Regression</div>
+            <p class="lp-pipe-desc">Learns draw-to-draw sequential patterns, co-occurrence relationships between numbers and deltas between consecutive appearances.</p>
+            <div class="lp-pipe-trainer">Microsoft.ML.Trainers</div>
+        </div>
+        <div class="lp-pipe-card">
+            <div class="lp-pipe-tag lp-tag-green">Positional</div>
+            <div class="lp-pipe-name">LightGBM Gradient Boost</div>
+            <p class="lp-pipe-desc">Captures per-slot positional bias and non-linear overdue probability curves using gradient boosting with 200 iterations.</p>
+            <div class="lp-pipe-trainer">Microsoft.ML.LightGbm</div>
+        </div>
+    </div>
+</section>
+
+<section class="lp-section" id="intelligence">
+    <div class="lp-awareness-row">
+        <div class="lp-awareness-left">
+            <div class="lp-section-label">Self-Awareness Engine</div>
+            <h2 class="lp-section-title">The system knows<br />when it's wrong.</h2>
+            <p class="lp-section-sub">
+                After every draw, Promethaion evaluates its own forecast, records the match
+                count, and updates its rolling accuracy window. If accuracy drifts below
+                threshold, it schedules a full retrain automatically — no human required.
+            </p>
+            <a href="/dashboard" class="lp-btn lp-btn-primary" style="margin-top:28px;display:inline-flex;">
+                View Intelligence →
+            </a>
+        </div>
+        <div class="lp-awareness-right">
+            <div class="lp-aw-item">
+                <div class="lp-aw-num">01</div>
+                <div>
+                    <div class="lp-aw-title">Evaluate</div>
+                    <div class="lp-aw-desc">Compare every forecast against the actual draw result and record the match count.</div>
+                </div>
+            </div>
+            <div class="lp-aw-item">
+                <div class="lp-aw-num">02</div>
+                <div>
+                    <div class="lp-aw-title">Track</div>
+                    <div class="lp-aw-desc">Maintain a rolling accuracy window over the last N predictions to detect drift early.</div>
+                </div>
+            </div>
+            <div class="lp-aw-item">
+                <div class="lp-aw-num">03</div>
+                <div>
+                    <div class="lp-aw-title">Signal</div>
+                    <div class="lp-aw-desc">Raise a retrain flag when rolling accuracy drops below the configured threshold.</div>
+                </div>
+            </div>
+            <div class="lp-aw-item">
+                <div class="lp-aw-num">04</div>
+                <div>
+                    <div class="lp-aw-title">Retrain</div>
+                    <div class="lp-aw-desc">Background service picks up the signal and runs a full pipeline training cycle.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="lp-cta">
+    <h2 class="lp-cta-title">Ready to start learning patterns?</h2>
+    <p class="lp-cta-sub">Seed the database, train the models, generate your first forecast.</p>
+    <a href="/dashboard" class="lp-btn lp-btn-primary lp-btn-lg">Get started →</a>
+</section>
+
+<footer class="lp-footer">
+    <div class="lp-footer-brand">P<span>AI</span> PROMETHAION</div>
+    <div class="lp-footer-copy">Where intelligence learns the patterns of reality.</div>
+</footer>
+
+<style>
+    .lp-nav, .lp-hero, .lp-section, .lp-cta, .lp-footer, .lp-awareness-row {
+        font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    .lp-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 48px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-card);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .lp-brand {
+        font-family: 'Orbitron', monospace;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        color: var(--text-primary);
+    }
+
+    .lp-brand span { color: var(--gold); }
+
+    .lp-nav-links {
+        display: flex;
+        gap: 32px;
+    }
+
+    .lp-nav-links a {
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        letter-spacing: 0.5px;
+        transition: color var(--transition);
+    }
+
+    .lp-nav-links a:hover { color: var(--text-primary); }
+
+    .lp-nav-actions { display: flex; gap: 10px; }
+
+    .lp-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 20px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: all var(--transition);
+    }
+
+    .lp-btn-primary {
+        background: var(--gold);
+        color: #060A10;
+        border-color: var(--gold);
+    }
+
+    .lp-btn-primary:hover { background: var(--gold-light); }
+
+    .lp-btn-outline {
+        background: transparent;
+        color: var(--text-secondary);
+        border-color: var(--border-bright);
+    }
+
+    .lp-btn-outline:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    .lp-btn-lg { padding: 13px 28px; font-size: 14px; }
+
+    .lp-hero {
+        padding: 80px 48px 64px;
+        text-align: center;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-deep);
+    }
+
+    .lp-eyebrow {
+        font-size: 11px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-bottom: 20px;
+    }
+
+    .lp-eyebrow span { color: var(--gold); }
+
+    .lp-hero-title {
+        font-family: 'Orbitron', monospace;
+        font-size: 40px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--text-primary);
+        margin-bottom: 20px;
+        letter-spacing: 1px;
+    }
+
+    .lp-hero-title span { color: var(--gold); }
+
+    .lp-hero-sub {
+        font-size: 16px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+        max-width: 520px;
+        margin: 0 auto 36px;
+    }
+
+    .lp-hero-actions {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 52px;
+    }
+
+    .lp-hero-stats {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        background: var(--bg-card);
+    }
+
+    .lp-hstat {
+        padding: 20px 36px;
+        border-right: 1px solid var(--border);
+        text-align: center;
+    }
+
+    .lp-hstat:last-child { border-right: none; }
+
+    .lp-hstat-val {
+        font-family: 'Orbitron', monospace;
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .lp-hstat-lbl {
+        font-size: 10px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-top: 4px;
+    }
+
+    .lp-section {
+        padding: 72px 48px;
+    }
+
+    .lp-section-alt {
+        background: var(--bg-card);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .lp-section-header {
+        margin-bottom: 48px;
+    }
+
+    .lp-section-label {
+        font-size: 11px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 10px;
+    }
+
+    .lp-section-title {
+        font-family: 'Orbitron', monospace;
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 12px;
+        letter-spacing: 1px;
+    }
+
+    .lp-section-sub {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.7;
+        max-width: 500px;
+    }
+
+    .lp-features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+    }
+
+    .lp-feat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        transition: border-color var(--transition), transform var(--transition);
+    }
+
+    .lp-feat-card:hover {
+        border-color: var(--border-bright);
+        transform: translateY(-2px);
+    }
+
+    .lp-feat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        margin-bottom: 16px;
+    }
+
+    .lp-icon-warning { background: rgba(176,120,32,0.15); color: var(--gold); }
+    .lp-icon-blue    { background: rgba(58,136,168,0.15); color: var(--blue-light); }
+    .lp-icon-green   { background: rgba(42,138,80,0.15);  color: var(--success-light); }
+
+    .lp-feat-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 8px;
+        letter-spacing: 0.3px;
+    }
+
+    .lp-feat-desc {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.65;
+    }
+
+    .lp-pipeline-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+    }
+
+    .lp-pipe-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+    }
+
+    .lp-pipe-tag {
+        font-size: 10px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        padding: 3px 10px;
+        border-radius: 20px;
+        display: inline-block;
+        margin-bottom: 14px;
+        font-weight: 600;
+    }
+
+    .lp-tag-warning { background: rgba(176,120,32,0.15); color: var(--gold); border: 1px solid var(--gold-dim); }
+    .lp-tag-blue    { background: rgba(58,136,168,0.15);  color: var(--blue-light); border: 1px solid var(--blue-dim); }
+    .lp-tag-green   { background: rgba(42,138,80,0.15);   color: var(--success-light); border: 1px solid var(--success); }
+
+    .lp-pipe-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 10px;
+    }
+
+    .lp-pipe-desc {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.65;
+    }
+
+    .lp-pipe-trainer {
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+        font-family: 'Courier New', monospace;
+    }
+
+    .lp-awareness-row {
+        display: flex;
+        gap: 64px;
+        align-items: flex-start;
+    }
+
+    .lp-awareness-left { flex: 1; }
+
+    .lp-awareness-right {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .lp-aw-item {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        padding: 20px 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .lp-aw-item:last-child { border-bottom: none; }
+
+    .lp-aw-num {
+        font-family: 'Orbitron', monospace;
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--gold-dim);
+        flex-shrink: 0;
+        width: 32px;
+    }
+
+    .lp-aw-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+    }
+
+    .lp-aw-desc {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+    }
+
+    .lp-cta {
+        padding: 80px 48px;
+        text-align: center;
+        border-top: 1px solid var(--border);
+        background: var(--bg-card);
+    }
+
+    .lp-cta-title {
+        font-family: 'Orbitron', monospace;
+        font-size: 30px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 12px;
+        letter-spacing: 1px;
+    }
+
+    .lp-cta-sub {
+        font-size: 15px;
+        color: var(--text-secondary);
+        margin-bottom: 32px;
+    }
+
+    .lp-footer {
+        padding: 24px 48px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--bg-deep);
+    }
+
+    .lp-footer-brand {
+        font-family: 'Orbitron', monospace;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        color: var(--text-secondary);
+    }
+
+    .lp-footer-brand span { color: var(--gold); }
+
+    .lp-footer-copy {
+        font-size: 12px;
+        color: var(--text-dim);
+        letter-spacing: 0.5px;
+    }
+
+    @@media (max-width: 960px) {
+        .lp-nav          { padding: 14px 20px; }
+        .lp-nav-links    { display: none; }
+        .lp-hero         { padding: 48px 20px; }
+        .lp-hero-title   { font-size: 26px; }
+        .lp-hero-stats   { flex-direction: column; display: flex; }
+        .lp-hstat        { border-right: none; border-bottom: 1px solid var(--border); }
+        .lp-section      { padding: 48px 20px; }
+        .lp-features-grid,
+        .lp-pipeline-grid { grid-template-columns: 1fr; }
+        .lp-awareness-row { flex-direction: column; gap: 32px; }
+        .lp-cta          { padding: 48px 20px; }
+        .lp-footer       { flex-direction: column; gap: 8px; text-align: center; }
+    }
+</style>
