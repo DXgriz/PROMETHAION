@@ -6,6 +6,142 @@
     "version": "v1"
   },
   "paths": {
+    "/api/events": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/events/recent/{count}": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "count",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/events/count": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/events/harvest/latest": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "parameters": [
+          {
+            "name": "gameName",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "SA Lotto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/forecasts": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/forecasts/latest": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/forecasts/accuracy": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/forecasts/scores": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "parameters": [
+          {
+            "name": "gameName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Harvester/sync/full": {
       "post": {
         "tags": [
@@ -49,12 +185,87 @@
           }
         }
       }
+    },
+    "/api/intelligence/status": {
+      "get": {
+        "tags": [
+          "Intelligence"
+        ],
+        "parameters": [
+          {
+            "name": "gameName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/intelligence/metrics": {
+      "get": {
+        "tags": [
+          "Intelligence"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/intelligence/load": {
+      "post": {
+        "tags": [
+          "Intelligence"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/intelligence/train": {
+      "post": {
+        "tags": [
+          "Intelligence"
+        ],
+        "parameters": [
+          {
+            "name": "gameName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": { },
   "tags": [
     {
+      "name": "Events"
+    },
+    {
+      "name": "Forecasts"
+    },
+    {
       "name": "Harvester"
+    },
+    {
+      "name": "Intelligence"
     }
   ]
 }

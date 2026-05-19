@@ -54,6 +54,12 @@
         "net10.0": {
           "framework": "net10.0",
           "targetAlias": "net10.0",
+          "dependencies": {
+            "Microsoft.Playwright": {
+              "target": "Package",
+              "version": "[1.59.0, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",
@@ -418,6 +424,10 @@
             "Microsoft.ML.LightGbm": {
               "target": "Package",
               "version": "[5.0.0, )"
+            },
+            "Microsoft.Playwright": {
+              "target": "Package",
+              "version": "[1.59.0, )"
             }
           },
           "imports": [

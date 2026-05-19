@@ -1,5 +1,109 @@
 [
   {
+    "ContainingType": "Promethaion.API.Controllers.EventsController",
+    "Method": "GetAll",
+    "RelativePath": "api/events",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.EventsController",
+    "Method": "Count",
+    "RelativePath": "api/events/count",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.EventsController",
+    "Method": "HarvestLatest",
+    "RelativePath": "api/events/harvest/latest",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "gameName",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.EventsController",
+    "Method": "GetRecent",
+    "RelativePath": "api/events/recent/{count}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "count",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.ForecastsController",
+    "Method": "GetAll",
+    "RelativePath": "api/forecasts",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.ForecastsController",
+    "Method": "Accuracy",
+    "RelativePath": "api/forecasts/accuracy",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "window",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.ForecastsController",
+    "Method": "Latest",
+    "RelativePath": "api/forecasts/latest",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.ForecastsController",
+    "Method": "Scores",
+    "RelativePath": "api/forecasts/scores",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "gameName",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "Promethaion.API.Controllers.HarvesterController",
     "Method": "FullSync",
     "RelativePath": "api/Harvester/sync/full",
@@ -19,6 +123,58 @@
     "ContainingType": "Promethaion.API.Controllers.HarvesterController",
     "Method": "LatestSync",
     "RelativePath": "api/Harvester/sync/latest",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "gameName",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.IntelligenceController",
+    "Method": "Load",
+    "RelativePath": "api/intelligence/load",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.IntelligenceController",
+    "Method": "Metrics",
+    "RelativePath": "api/intelligence/metrics",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.IntelligenceController",
+    "Method": "Status",
+    "RelativePath": "api/intelligence/status",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "gameName",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Promethaion.API.Controllers.IntelligenceController",
+    "Method": "Train",
+    "RelativePath": "api/intelligence/train",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,

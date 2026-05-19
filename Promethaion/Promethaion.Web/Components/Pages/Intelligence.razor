@@ -1,0 +1,346 @@
+﻿@page "/intelligence"
+@inject IPromethaionApiClient Api
+@inject TrainingHubService Hub
+@inject IToastService Toast
+@using Blazored.Toast.Services
+@implements IAsyncDisposable
+@using Promethaion.Web.Models
+@using Promethaion.Web.Services
+@using static Promethaion.Web.Models.ApiModels
+
+<PageTitle>Intelligence — Promethaion</PageTitle>
+
+<div class="top-bar">
+    <div class="page-title">INTEL<span>LIGENCE</span></div>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <span class="badge @(Hub.IsConnected ? "badge-green" : "badge-dim")">
+            @(Hub.IsConnected ? "● Hub Connected" : "○ Hub Disconnected")
+        </span>
+        <button class="btn btn-gold" @onclick="TriggerTrainingAsync" disabled="@(_training || _status?.ModelsLoaded == false && _events < 20)">
+            @(_training ? "Training…" : "⬡ Train Models")
+        </button>
+        <button class="btn btn-outline btn-sm" @onclick="LoadModelsAsync" disabled="@_loadingModels">
+            @(_loadingModels ? "Loading…" : "↓ Load Models")
+        </button>
+    </div>
+</div>
+
+<div class="page-body">
+
+    <!-- Training progress -->
+    @if (_training || _trainingLog.Count > 0)
+    {
+        <div class="card section-gap">
+            <div class="card-header">
+                <span class="card-title">Training Progress</span>
+                @if (_training)
+                { <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> }
+                else
+                { <button class="btn btn-outline btn-sm" @onclick="() => _trainingLog.Clear()">Clear</button> }
+            </div>
+            @if (_training)
+            {
+                <div class="progress-track" style="margin-bottom:12px;">
+                    <div class="progress-fill" style="width:@_trainingProgress%;transition:width 0.5s ease;"></div>
+                </div>
+            }
+            <div class="training-log">
+                @foreach (var line in _trainingLog)
+                {
+                    <div class="log-line @line.Type">
+                        <span class="log-time">@line.Time</span>
+                        <span>@line.Message</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Status stats -->
+    <div class="stat-grid section-gap">
+        <div class="stat-card" style="--accent:var(--gold)">
+            <div class="stat-label">Training Records</div>
+            <div class="stat-value">@_events.ToString("N0")</div>
+            <div class="stat-sub">@(_events >= 20 ? "Ready to train" : "Need 20+ to train")</div>
+        </div>
+        <div class="stat-card" style="--accent:var(--blue)">
+            <div class="stat-label">Models</div>
+            <div class="stat-value @(_status?.ModelsLoaded == true ? "text-success" : "text-danger")">
+                @(_status?.ModelsLoaded == true ? "Loaded" : "Not Loaded")
+            </div>
+            <div class="stat-sub">3 pipelines</div>
+        </div>
+        <div class="stat-card" style="--accent:var(--success-light)">
+            <div class="stat-label">Rolling Accuracy</div>
+            <div class="stat-value text-success">@(_status?.RollingAccuracy.ToString("F2") ?? "—")</div>
+            <div class="stat-sub">/ 6.00 possible</div>
+        </div>
+        <div class="stat-card" style="--accent:@(_status?.ShouldRetrain == true ? "var(--danger-light)" : "var(--text-dim)")">
+            <div class="stat-label">Self-Awareness</div>
+            <div class="stat-value @(_status?.ShouldRetrain == true ? "text-danger" : "text-success")">
+                @(_status?.ShouldRetrain == true ? "Retrain" : "Stable")
+            </div>
+            <div class="stat-sub">@(_status?.EvaluatedPredictions ?? 0) predictions evaluated</div>
+        </div>
+    </div>
+
+    <!-- Pipeline metrics -->
+    <div class="grid-3 section-gap">
+        @foreach (var pipeline in _pipelines)
+        {
+            <div class="card pipeline-card">
+                <div class="pipeline-tag @PipelineTagClass(pipeline.PipelineName)">
+                    @ShortName(pipeline.PipelineName)
+                </div>
+                <div class="pipeline-name">@pipeline.PipelineName</div>
+                <div class="pipeline-version text-dim">@pipeline.ModelVersion</div>
+                <div class="pipeline-metrics">
+                    <div class="pm-item">
+                        <div class="pm-label">R²</div>
+                        <div class="pm-value text-gold">@pipeline.RSquared.ToString("F4")</div>
+                    </div>
+                    <div class="pm-item">
+                        <div class="pm-label">MAE</div>
+                        <div class="pm-value">@pipeline.MeanAbsoluteError.ToString("F4")</div>
+                    </div>
+                    <div class="pm-item">
+                        <div class="pm-label">RMSE</div>
+                        <div class="pm-value">@pipeline.RootMeanSquaredError.ToString("F4")</div>
+                    </div>
+                    <div class="pm-item">
+                        <div class="pm-label">Train set</div>
+                        <div class="pm-value">@pipeline.TrainingSetSize.ToString("N0")</div>
+                    </div>
+                </div>
+                @if (pipeline.IsBestVersion)
+                { <div class="badge badge-green" style="margin-top:12px;">★ Best Version</div> }
+                <div class="text-dim" style="font-size:10px;margin-top:8px;">
+                    @pipeline.TrainedAt.ToString("dd MMM yyyy HH:mm")
+                </div>
+            </div>
+        }
+        @if (_pipelines.Count == 0)
+        {
+            @for (int i = 0; i < 3; i++)
+            {
+                <div class="card pipeline-card">
+                    <div class="empty-state" style="padding:24px 0;">
+                        <p style="font-size:12px;">Not trained yet</p>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <!-- Full metrics history -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Training History</span>
+            <button class="btn btn-outline btn-sm" @onclick="LoadMetricsAsync">⟳ Refresh</button>
+        </div>
+        @if (_allMetrics.Count == 0)
+        {
+            <div class="empty-state"><p>No training runs yet. Click <strong>Train Models</strong> to begin.</p></div>
+        }
+        else
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Pipeline</th><th>Version</th><th>Trained</th>
+                        <th>Train Set</th><th>R²</th><th>MAE</th><th>RMSE</th><th>Best</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var m in _allMetrics)
+                    {
+                        <tr>
+                            <td>
+                                <span class="badge @PipelineTagClass(m.PipelineName)">@ShortName(m.PipelineName)</span>
+                            </td>
+                            <td class="text-dim" style="font-size:11px;">@m.ModelVersion</td>
+                            <td class="text-muted">@m.TrainedAt.ToString("dd MMM yyyy HH:mm")</td>
+                            <td class="text-muted">@m.TrainingSetSize.ToString("N0")</td>
+                            <td class="text-gold">@m.RSquared.ToString("F4")</td>
+                            <td class="text-muted">@m.MeanAbsoluteError.ToString("F4")</td>
+                            <td class="text-muted">@m.RootMeanSquaredError.ToString("F4")</td>
+                            <td>@if(m.IsBestVersion){<span class="badge badge-green">★ Best</span>}</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<style>
+    .training-log{max-height:240px;overflow-y:auto;background:var(--bg-deep);border-radius:var(--radius);padding:12px;font-family:'Courier New',monospace;}
+    .log-line{display:flex;gap:10px;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);}
+    .log-time{color:var(--text-dim);flex-shrink:0;width:60px;}
+    .log-line.success{color:var(--success-light);}
+    .log-line.error{color:var(--danger-light);}
+    .log-line.info{color:var(--text-secondary);}
+    .log-line.progress{color:var(--gold);}
+    .pipeline-card{display:flex;flex-direction:column;}
+    .pipeline-tag{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:10px;font-weight:600;width:fit-content;}
+    .tag-freq{background:rgba(200,128,40,0.15);color:var(--gold);border:1px solid var(--gold-dim);}
+    .tag-seq{background:rgba(58,136,168,0.15);color:var(--blue-light);border:1px solid var(--blue-dim);}
+    .tag-pos{background:rgba(42,138,80,0.15);color:var(--success-light);border:1px solid var(--success);}
+    .pipeline-name{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:2px;}
+    .pipeline-version{font-size:10px;margin-bottom:14px;}
+    .pipeline-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .pm-item{background:var(--bg-panel);border-radius:var(--radius);padding:8px 10px;border:1px solid var(--border);}
+    .pm-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:3px;}
+    .pm-value{font-size:14px;font-weight:600;color:var(--text-primary);}
+</style>
+
+@code {
+    private SystemStatusDto?          _status;
+    private List<TrainingMetricsDto>  _allMetrics = [];
+    private List<TrainingMetricsDto>  _pipelines  = [];
+    private bool                      _training     = false;
+    private bool                      _loadingModels = false;
+    private int                       _events       = 0;
+    private int                       _trainingProgress = 0;
+    private List<LogLine>             _trainingLog  = [];
+
+    private record LogLine(string Time, string Message, string Type);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+        await ConnectHubAsync();
+    }
+
+    private async Task LoadAllAsync()
+    {
+        await Task.WhenAll(
+            Api.GetSystemStatusAsync().ContinueWith(t => _status = t.Result),
+            Api.GetAllMetricsAsync().ContinueWith(t => _allMetrics = t.Result),
+            Api.GetEventCountAsync().ContinueWith(t => _events = t.Result)
+        );
+        LoadPipelineSummary();
+        await LoadMetricsAsync();
+    }
+
+    private async Task LoadMetricsAsync()
+    {
+        _allMetrics = await Api.GetAllMetricsAsync();
+        LoadPipelineSummary();
+    }
+
+    private void LoadPipelineSummary()
+    {
+        _pipelines = _allMetrics
+            .GroupBy(m => m.PipelineName)
+            .Select(g => g.OrderByDescending(m => m.TrainedAt).First())
+            .ToList();
+    }
+
+    private async Task ConnectHubAsync()
+    {
+        try
+        {
+            Hub.OnTrainingStarted   += OnTrainingStarted;
+            Hub.OnPipelineProgress  += OnPipelineProgress;
+            Hub.OnTrainingCompleted += OnTrainingCompleted;
+            Hub.OnTrainingFailed    += OnTrainingFailed;
+            await Hub.ConnectAsync();
+            AddLog("Hub connected.", "success");
+        }
+        catch { AddLog("Hub connection failed — live updates unavailable.", "error"); }
+    }
+
+    private void OnTrainingStarted(string game)
+    {
+        _training = true;
+        _trainingProgress = 5;
+        AddLog($"Training started for {game}.", "progress");
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnPipelineProgress(string name, int pct, string msg)
+    {
+        _trainingProgress = Math.Max(_trainingProgress, pct);
+        AddLog($"[{name}] {msg}", "info");
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTrainingCompleted(List<TrainingHubService.PipelineResult> results)
+    {
+        _training = false;
+        _trainingProgress = 100;
+        foreach (var r in results)
+            AddLog($"✓ {r.PipelineName} — R²: {r.RSquared:F4} MAE: {r.MeanAbsoluteError:F4} {(r.IsBestVersion ? "★ Best" : "")}", "success");
+        InvokeAsync(async () => { await LoadAllAsync(); StateHasChanged(); });
+        Toast.ShowSuccess("Training complete.");
+    }
+
+    private void OnTrainingFailed(string err)
+    {
+        _training = false;
+        AddLog($"✗ Training failed: {err}", "error");
+        InvokeAsync(StateHasChanged);
+        Toast.ShowError("Training failed.");
+    }
+
+    private async Task TriggerTrainingAsync()
+    {
+        _training = true;
+        _trainingLog.Clear();
+        _trainingProgress = 2;
+        AddLog("Sending train request to API…", "info");
+        try
+        {
+            await Api.TriggerTrainingAsync();
+            AddLog("Training request accepted. Waiting for SignalR updates…", "progress");
+        }
+        catch
+        {
+            _training = false;
+            AddLog("Failed to reach API.", "error");
+            Toast.ShowError("Could not trigger training.");
+        }
+    }
+
+    private async Task LoadModelsAsync()
+    {
+        _loadingModels = true;
+        try
+        {
+            await Api.LoadModelsAsync();
+            _status = await Api.GetSystemStatusAsync();
+            Toast.ShowSuccess("Models loaded from disk.");
+        }
+        catch { Toast.ShowError("Failed to load models."); }
+        finally { _loadingModels = false; }
+    }
+
+    private void AddLog(string message, string type = "info") =>
+        _trainingLog.Add(new LogLine(DateTime.Now.ToString("HH:mm:ss"), message, type));
+
+    private static string PipelineTagClass(string name) => name switch
+    {
+        var n when n.Contains("Frequency") => "badge-gold tag-freq",
+        var n when n.Contains("Sequence")  => "badge-blue tag-seq",
+        var n when n.Contains("Positional")=> "badge-green tag-pos",
+        _ => "badge-dim"
+    };
+
+    private static string ShortName(string name) => name switch
+    {
+        var n when n.Contains("Frequency")  => "Frequency",
+        var n when n.Contains("Sequence")   => "Sequence",
+        var n when n.Contains("Positional") => "Positional",
+        _ => name
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        Hub.OnTrainingStarted   -= OnTrainingStarted;
+        Hub.OnPipelineProgress  -= OnPipelineProgress;
+        Hub.OnTrainingCompleted -= OnTrainingCompleted;
+        Hub.OnTrainingFailed    -= OnTrainingFailed;
+        await Hub.DisconnectAsync();
+    }
+}

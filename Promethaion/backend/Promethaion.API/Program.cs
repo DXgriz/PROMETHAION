@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Promethaion.API.BackgroundServices;
 using Promethaion.API.Extensions;
 using Promethaion.API.Hubs;
+using Promethaion.API.Services;
 using Promethaion.Core.Interfaces;
 using Promethaion.Core.Services;
 using Promethaion.Data;
@@ -11,10 +12,9 @@ using Promethaion.ML;
 using Promethaion.ML.Pipelines;
 using Promethaion.ML.Services;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Database Registration with retry logic for transient faults
+// ── Database — with retry logic for transient faults ──────────────────────────
 builder.Services.AddDbContext<PAionDbContext>(opt =>
     opt.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -26,15 +26,15 @@ builder.Services.AddDbContext<PAionDbContext>(opt =>
                 errorNumbersToAdd: null);
         }));
 
-// ── Repositories 
+// ── Repositories ──────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IPatterneventRepository, PatternEventRepository>();
 builder.Services.AddScoped<IPatternForecastRepository, ForecastRepository>();
 builder.Services.AddScoped<ITrainingMetricsRepository, TrainingMetricsRepository>();
 
-// ── Core Services 
+// ── Core Services ─────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IAdaptiveIntelligenceEngine, AdaptiveIntelligenceEngine>();
 
-// ── ML Pipelines 
+// ── ML Pipelines ──────────────────────────────────────────────────────────────
 var modelsDir = builder.Configuration.GetValue<string>("ML:ModelsDirectory") ?? "models";
 
 builder.Services.AddSingleton<FrequencyAnalysisPipeline>(_ => new FrequencyAnalysisPipeline(modelsDir));
@@ -50,26 +50,34 @@ builder.Services.AddSingleton<IAnalysisPipeline>(sp => sp.GetRequiredService<Pos
 builder.Services.AddSingleton<IEnsembleEngine>(sp =>
     new EnsembleEngine(sp.GetRequiredService<IEnumerable<IAnalysisPipeline>>()));
 
-// Pipeline trainer (scoped because it uses scoped ITrainingMetricsRepository indirectly).
+// Pipeline trainer (scoped because it uses scoped ITrainingMetricsRepository).
 builder.Services.AddScoped<PipelineTrainer>();
+builder.Services.AddScoped<PredictionService>();
+// ── Background Services ───────────────────────────────────────────────────────
 
-// ── Background Service 
+// Harvest service — scrapes draw results on startup and on draw days (Wed & Sat).
+// Registered as singleton so LearningBackgroundService can subscribe to its event.
+builder.Services.AddSingleton<HarvestBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<HarvestBackgroundService>());
+
+// Learning/Training service — subscribes to HarvestBackgroundService.OnHarvestCompleted
+// and retrains models automatically when new data arrives.
 builder.Services.AddSingleton<LearningBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<LearningBackgroundService>());
 
-
-//Automated Data Harversters 
-builder.Services.AddHttpClient<IDataHarvester, HistoryResultsHarvester>(client => {
+// ── Data Harvester ────────────────────────────────────────────────────────────
+builder.Services.AddHttpClient<IDataHarvester, HistoryResultsHarvester>(client =>
+{
     client.BaseAddress = new Uri("https://www.lotteryresults.co.za");
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; PromethaionHarvester/1.0)");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "Mozilla/5.0 (compatible; PromethaionHarvester/1.0)");
     client.Timeout = TimeSpan.FromSeconds(30);
 });
-builder.Services.AddHostedService<HarvestBackgroundService>();
 
-// ── SignalR 
+// ── SignalR ───────────────────────────────────────────────────────────────────
 builder.Services.AddSignalR();
 
-// ── API / Swagger 
+// ── API / Swagger ─────────────────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -86,31 +94,65 @@ builder.Services.AddSwaggerGen(c =>
     if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
 });
 
-builder.Services.AddCors(opt => opt.AddDefaultPolicy(p =>
-    p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+// ── CORS ──────────────────────────────────────────────────────────────────────
+// IMPORTANT: AllowAnyOrigin() is incompatible with AllowCredentials().
+// SignalR requires credentials, so we must use WithOrigins() explicitly.
+// Add the Blazor Web URL to appsettings.json under "Web:BaseUrl".
+var webBaseUrl = builder.Configuration.GetValue<string>("Web:BaseUrl")
+                 ?? "https://localhost:7152";
 
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("AllowFrontend", policy =>
+//    {
+//        policy.WithOrigins(webBaseUrl)
+//              .AllowAnyHeader()
+//              .AllowAnyMethod()
+//              .AllowCredentials();
+//    });
+//});
 
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+                "https://localhost:7152",  //frontend
+                "https://localhost:7161",   // (same API origin)
+                webBaseUrl
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+// ─────────────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
 // Run EF Core migrations on startup.
-//await app.ApplySafeMigrationsAsync();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<PAionDbContext>();
-
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     try
     {
         await db.Database.MigrateAsync();
+        logger.LogInformation("Database migration applied successfully.");
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider
-            .GetRequiredService<ILogger<Program>>();
-
         logger.LogError(ex, "Database migration failed.");
     }
 }
+
+// ── Wire harvest → training event ─────────────────────────────────────────────
+// HarvestBackgroundService fires OnHarvestCompleted when new records arrive.
+// LearningBackgroundService listens and triggers a retrain automatically.
+var harvestService = app.Services.GetRequiredService<HarvestBackgroundService>();
+var learningService = app.Services.GetRequiredService<LearningBackgroundService>();
+
+harvestService.OnHarvestCompleted += async (newRecords) =>
+    await learningService.RunTrainingCycleAsync("SA Lotto", CancellationToken.None);
 
 if (app.Environment.IsDevelopment())
 {
@@ -119,10 +161,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors();
-
+app.UseCors("AllowFrontend");
 app.UseAuthorization();
-
 app.MapControllers();
 app.MapHub<LearningHub>("/hubs/training");
 

@@ -1,81 +1,111 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using HtmlAgilityPack;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Playwright;
 using Promethaion.Core.Entities;
 using Promethaion.Core.Interfaces;
-using HtmlAgilityPack;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Xml;
+using Promethaion.Data.Repositories;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Promethaion.Data.Harvesters;
+
 /// <summary>
 /// Scrapes https://www.lotteryresults.co.za and normalises
 /// every SA Lotto draw into a clean PatternEvent record.
-///
-/// Source structure (per monthly page):
-///   Heading : "Wednesday 29 January 2025"
-///   7 balls : first 6 = main balls, 7th = bonus ball
-///
-/// URL pattern:
-///   Archive : /lotto/archive
-///   Monthly : /lotto/{month-name}-{year}   e.g. /lotto/january-2025
+/// Deduplicates by DrawDate — never by DrawNumber — to avoid
+/// the sequence-reset bug where numbers collide across months.
 /// </summary>
 public class HistoryResultsHarvester : IDataHarvester
 {
+    #region Fields & Constructor
     private const string BaseUrl = "https://www.lotteryresults.co.za";
     private const string ArchiveUrl = "/lotto/archive";
 
     private readonly HttpClient _http;
     private readonly IPatterneventRepository _repo;
     private readonly ILogger<HistoryResultsHarvester> _log;
+    private readonly PAionDbContext _context;
 
     public string SourceName => "lotteryresults.co.za";
 
     public HistoryResultsHarvester(
         HttpClient http,
         IPatterneventRepository repo,
-        ILogger<HistoryResultsHarvester> log)
+        ILogger<HistoryResultsHarvester> log,
+        PAionDbContext context)
     {
         _http = http;
         _repo = repo;
         _log = log;
+        _context = context;
     }
+    #endregion
 
-    // ── Public API ────────────────────────────────────────────────────────────
+    #region Public API
 
     public async Task<HarvestResult> SyncAsync(
         string gameName = "SA Lotto",
         CancellationToken ct = default)
     {
         _log.LogInformation("[Harvester] Full sync started from {Source}", SourceName);
-
         var monthUrls = await GetAllMonthUrlsAsync(ct);
-        _log.LogInformation("[Harvester] Found {Count} monthly pages to process.", monthUrls.Count);
-
+        _log.LogInformation("[Harvester] Found {Count} monthly pages.", monthUrls.Count);
         return await ProcessMonthsAsync(monthUrls, gameName, ct);
     }
 
+
     public async Task<HarvestResult> SyncLatestAsync(
-        string gameName = "SA Lotto",
-        CancellationToken ct = default)
+    string gameName = "SA Lotto",
+    CancellationToken ct = default)
     {
-        _log.LogInformation("[Harvester] Latest-only sync started.");
-
-        // Only fetch the current month and the previous month
-        // in case we are near a month boundary.
-        var now = DateTime.UtcNow;
-        var urls = new List<string>
+        if (!(await _repo.GetAllAsync(gameName)).Any())
         {
-            BuildMonthUrl(now.Year, now.Month),
-            BuildMonthUrl(now.Year, now.Month == 1 ? 12 : now.Month - 1)
-        };
+            _log.LogInformation("[Harvester] DB empty → running full sync");
+            return await SyncAsync(gameName, ct);
+        }
 
-        return await ProcessMonthsAsync(urls, gameName, ct);
+        _log.LogInformation("[Harvester] Smart latest-sync started.");
+
+        var now = DateTime.Now;
+
+        var validUrls = new List<string>();
+        int maxLookbackMonths = 6;
+
+        for (int i = 0; i < maxLookbackMonths; i++)
+        {
+            var date = now.AddMonths(-i);
+            var url = BuildMonthUrl(date.Year, date.Month);
+
+            var html = await FetchHtmlAsync(url, ct);
+
+            if (html != null && html.Length > 1000)
+            {
+                _log.LogInformation("[Harvester] Found valid page: {Url}", url);
+                validUrls.Add(url);
+
+                if (validUrls.Count >= 2)
+                    break;
+            }
+            else
+            {
+                _log.LogWarning("[Harvester] Skipping invalid month: {Url}", url);
+            }
+        }
+
+        if (validUrls.Count == 0)
+        {
+            _log.LogWarning("[Harvester] No valid recent months found.");
+            return new HarvestResult(0, 0, 0, SourceName, DateTime.Now,
+                new List<string> { "No valid months found" });
+        }
+
+        return await ProcessMonthsAsync(validUrls, gameName, ct);
     }
+    #endregion
 
-    // ── Internals ─────────────────────────────────────────────────────────────
+    #region Core pipeline
 
-    /// <summary>Reads the archive page and collects all monthly URLs.</summary>
     private async Task<List<string>> GetAllMonthUrlsAsync(CancellationToken ct)
     {
         var html = await FetchHtmlAsync(BaseUrl + ArchiveUrl, ct);
@@ -84,50 +114,62 @@ public class HistoryResultsHarvester : IDataHarvester
         var doc = new HtmlDocument();
         doc.LoadHtml(html);
 
-        // All links inside the archive list that match /lotto/{month}-{year}
         var links = doc.DocumentNode
             .SelectNodes("//a[contains(@href,'/lotto/') and contains(@href,'-20')]")
             ?.Select(a => a.GetAttributeValue("href", ""))
-            .Where(href => !string.IsNullOrWhiteSpace(href)
-                        && !href.Contains("archive")
-                        && !href.Contains("results-"))
+            .Where(h => !string.IsNullOrWhiteSpace(h)
+                     && !h.Contains("archive")
+                     && !h.Contains("results-"))
             .Distinct()
-            .Select(href => href.StartsWith("http") ? href : BaseUrl + href)
+            .Select(h => h.StartsWith("http") ? h : BaseUrl + h)
             .ToList() ?? [];
 
-        return links;
+        // Sort oldest-first so draw numbers are assigned in chronological order.
+        return links.OrderBy(u => u).ToList();
     }
 
-    /// <summary>Processes a list of monthly page URLs and persists new draws.</summary>
     private async Task<HarvestResult> ProcessMonthsAsync(
-        List<string> monthUrls,
-        string gameName,
-        CancellationToken ct)
+    List<string> monthUrls,
+    string gameName,
+    CancellationToken ct)
     {
         int newRecords = 0, skipped = 0, failed = 0;
         var errors = new List<string>();
 
-        // Get the highest draw number already in the DB to avoid re-processing.
-        int maxKnown = await _repo.GetMaxDrawNumberAsync(gameName);
+        var existingEvents = await _repo.GetAllAsync(gameName);
+        var existingDates = existingEvents
+            .Select(e => e.DrawDate.Date)
+            .ToHashSet();
+
+        int drawSequence = existingEvents.Count > 0
+            ? existingEvents.Max(e => e.DrawNumber)
+            : 0;
+
+        _log.LogInformation("[Harvester] DB has {Count} records. Starting from draw #{Seq}.",
+            existingEvents.Count, drawSequence);
 
         foreach (var url in monthUrls)
         {
             ct.ThrowIfCancellationRequested();
-
             try
             {
-                var draws = await ScrapeMonthPageAsync(url, gameName, ct);
+                // ✅ Unpack tuple — drawSequence carries forward across all months
+                var (draws, updatedSequence) = await ScrapeMonthPageAsync(url, gameName, drawSequence, ct);
+                drawSequence = updatedSequence;
 
                 foreach (var draw in draws)
                 {
-                    // We assign draw numbers by date order — check if date already stored.
-                    bool exists = (await _repo.GetByDrawNumberAsync(draw.DrawNumber, gameName)) is not null;
-                    if (exists) { skipped++; continue; }
+                    if (existingDates.Contains(draw.DrawDate.Date))
+                    {
+                        skipped++;
+                        continue;
+                    }
 
                     await _repo.AddAsync(draw);
+                    existingDates.Add(draw.DrawDate.Date);
                     newRecords++;
 
-                    _log.LogDebug("[Harvester] Saved draw #{Num} on {Date}",
+                    _log.LogDebug("[Harvester] Saved draw #{Num} — {Date}",
                         draw.DrawNumber, draw.DrawDate.ToString("yyyy-MM-dd"));
                 }
             }
@@ -139,87 +181,82 @@ public class HistoryResultsHarvester : IDataHarvester
                 _log.LogWarning(msg);
             }
 
-            // Be polite — small delay between page requests.
-            await Task.Delay(400, ct);
+            await Task.Delay(350, ct);
         }
 
         _log.LogInformation(
-            "[Harvester] Sync complete. New={New} Skipped={Skip} Failed={Fail}",
+            "[Harvester] Done. New={N} Skipped={S} Failed={F}",
             newRecords, skipped, failed);
 
-        return new HarvestResult(newRecords, skipped, failed, SourceName, DateTime.UtcNow, errors);
+        return new HarvestResult(newRecords, skipped, failed, SourceName, DateTime.Now, errors);
     }
 
-    /// <summary>Scrapes a single monthly results page into PatternEvent records.</summary>
-    private async Task<List<PatternEvent>> ScrapeMonthPageAsync(
-        string url, string gameName, CancellationToken ct)
+    /// <summary>
+    /// Scrapes one monthly page.
+    /// drawSequence is ref — it persists across all calls from ProcessMonthsAsync.
+    /// </summary>
+    private async Task<(List<PatternEvent> Events, int UpdatedSequence)> ScrapeMonthPageAsync(
+    string url,
+    string gameName,
+    int drawSequence,
+    CancellationToken ct)
     {
-        var html = await FetchHtmlAsync(url, ct);
-        if (html is null) return [];
+        var json = await FetchHtmlWithBrowser(url);
 
-        var doc = new HtmlDocument();
-        doc.LoadHtml(html);
+        if (string.IsNullOrWhiteSpace(json))
+            return (new List<PatternEvent>(), drawSequence);
+
+        var rawData = JsonSerializer.Deserialize<List<DrawDto>>(json);
+
+        if (rawData == null || rawData.Count == 0)
+        {
+            _log.LogWarning("❌ No draw data found");
+            return (new List<PatternEvent>(), drawSequence);
+        }
 
         var results = new List<PatternEvent>();
 
-        // Each draw is represented as a heading (h2/h3) with date text
-        // followed by a list of ball numbers.
-        // lotteryresults.co.za renders them as:
-        //   <h3><a href="/lotto/results-...">Wednesday 29 January 2025</a></h3>
-        //   <ul class="balls"> <li>6</li><li>24</li>...<li>14</li> </ul>
-
-        var drawHeadings = doc.DocumentNode
-            .SelectNodes("//h2[contains(@class,'draw') or a[contains(@href,'results-')]] | //h3[a[contains(@href,'results-')]]");
-
-        if (drawHeadings is null || drawHeadings.Count == 0)
-        {
-            // Fallback: try any heading containing a date-like link
-            drawHeadings = doc.DocumentNode
-                .SelectNodes("//*[self::h2 or self::h3][.//a[contains(@href,'/lotto/results-')]]");
-        }
-
-        if (drawHeadings is null) return results;
-
-        int drawSequence = await _repo.GetMaxDrawNumberAsync(gameName);
-
-        foreach (var heading in drawHeadings)
+        foreach (var draw in rawData)
         {
             try
             {
-                // Parse date from heading text e.g. "Wednesday 29 January 2025"
-                var dateText = HtmlEntity.DeEntitize(heading.InnerText).Trim();
-                if (!TryParseDrawDate(dateText, out var drawDate)) continue;
+                if (draw.Numbers == null || draw.Numbers.Count < 7)
+                    continue;
 
-                // Ball numbers are in the next sibling node containing <li> elements
-                var ballContainer = heading.SelectSingleNode(
-                    "following-sibling::ul[1] | following-sibling::div[contains(@class,'ball')][1] | following-sibling::ol[1]");
+                if (string.IsNullOrWhiteSpace(draw.DateText))
+                    continue;
 
-                if (ballContainer is null)
+                if (!TryParseDrawDate(draw.DateText, out var drawDate))
                 {
-                    // Try parent's next sibling
-                    ballContainer = heading.ParentNode?.SelectSingleNode(
-                        "following-sibling::*[.//li or .//span[contains(@class,'ball')]][1]");
+                    _log.LogDebug("⏩ Invalid date format: {Date}", draw.DateText);
+                    continue;
                 }
 
-                if (ballContainer is null) continue;
+                var values = draw.Numbers;
 
-                var ballNodes = ballContainer.SelectNodes(".//li | .//span[contains(@class,'ball')]");
-                if (ballNodes is null || ballNodes.Count < 7) continue;
+                if (values.Distinct().Count() < 5)
+                    continue;
 
-                var allBalls = ballNodes
-                    .Select(n => n.InnerText.Trim())
-                    .Where(t => int.TryParse(t, out _))
-                    .Select(int.Parse)
-                    .ToArray();
+                if (values.Max() < 20)
+                    continue;
 
-                if (allBalls.Length < 7) continue;
+                var mainBalls = values.Take(6).OrderBy(x => x).ToArray();
+                int bonusBall = values[6];
 
-                var mainBalls = allBalls.Take(6).OrderBy(x => x).ToArray();
-                int bonusBall = allBalls[6];
+                bool exists = await _context.DrawResults.AnyAsync(d =>
+                    d.GameName == gameName &&
+                    d.DrawDate.Date == drawDate.Date,
+                    ct);
+
+                if (exists)
+                {
+                    _log.LogDebug("⏩ Already exists: {Date}", drawDate);
+                    continue;
+                }
 
                 drawSequence++;
 
-                results.Add(new PatternEvent
+                var evt = new PatternEvent
                 {
                     DrawNumber = drawSequence,
                     DrawDate = drawDate,
@@ -231,25 +268,34 @@ public class HistoryResultsHarvester : IDataHarvester
                     Ball6 = mainBalls[5],
                     BonusBall = bonusBall,
                     GameName = gameName
-                });
+                };
+
+                results.Add(evt);
+
+                _log.LogInformation(
+                    $"✅ REAL Draw #{drawSequence}: {string.Join(",", values)} ({drawDate:yyyy-MM-dd})");
             }
             catch (Exception ex)
             {
-                _log.LogDebug("[Harvester] Skipping malformed draw entry: {Err}", ex.Message);
+                _log.LogDebug("Skip draw error: {Err}", ex.Message);
             }
         }
 
-        // Sort oldest-first so draw numbers are assigned chronologically.
-        return results.OrderBy(r => r.DrawDate).ToList();
+        return (results, drawSequence);
     }
+    #endregion
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    #region Helpers
 
     private async Task<string?> FetchHtmlAsync(string url, CancellationToken ct)
     {
         try
         {
-            var response = await _http.GetAsync(url, ct);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("Accept", "text/html,application/xhtml+xml");
+            request.Headers.Add("Accept-Language", "en-ZA,en;q=0.9");
+
+            var response = await _http.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync(ct);
         }
@@ -260,35 +306,115 @@ public class HistoryResultsHarvester : IDataHarvester
         }
     }
 
+
+    private async Task<string?> FetchHtmlWithBrowser(string url)
+    {
+        using var playwright = await Playwright.CreateAsync();
+
+        await using var browser = await playwright.Chromium.LaunchAsync(new()
+        {
+            Headless = true,
+            Channel = "chrome",
+            Args = new[]
+            {
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-dev-shm-usage"
+        }
+        });
+
+        var context = await browser.NewContextAsync(new()
+        {
+            UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+        });
+
+        var page = await context.NewPageAsync();
+
+        await page.GotoAsync(url, new()
+        {
+            WaitUntil = WaitUntilState.NetworkIdle
+        });
+
+        await page.WaitForSelectorAsync("body");
+
+        await page.WaitForTimeoutAsync(2000);
+
+        var data = await page.EvaluateAsync<object>(@"
+                () => {
+                        const draws = [];
+                        const seen = new Set();
+
+                        const blocks = document.querySelectorAll(""div"");
+
+                        blocks.forEach(block => {
+                            const text = block.innerText;
+
+                            if (!text) return;
+
+                            const dateMatch = text.match(/\b\d{1,2}\s+[A-Za-z]+\s+\d{4}\b/);
+                            if (!dateMatch) return;
+
+                            const dateText = dateMatch[0];
+
+                            const matches = text.match(/\b\d{1,2}\b/g);
+                            if (!matches || matches.length < 7) return;
+
+                            const nums = matches
+                                .map(n => parseInt(n))
+                                .filter(n => n >= 1 && n <= 52);
+
+                            if (nums.length < 7) return;
+
+                            const drawKey = dateText + ""-"" + nums.slice(0,7).join("","");
+
+                            if (seen.has(drawKey)) return;
+                            seen.add(drawKey);
+
+                            draws.push({
+                                DateText: dateText,
+                                Numbers: nums.slice(0, 7)
+                            });
+                        });
+
+                        return draws;
+                        }
+
+        ");
+
+        return JsonSerializer.Serialize(data);
+    }
+
+
     private static bool TryParseDrawDate(string text, out DateTime date)
     {
-        // Handles formats:
-        //   "Wednesday 29 January 2025"
-        //   "Saturday 11 March 2000"
+        date = default;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+
+        // Strip day-of-week: "Wednesday 29 January 2025" → "29 January 2025"
+        var cleaned = Regex.Replace(text, @"^[A-Za-z]+\s+", "").Trim();
+
         var formats = new[]
         {
+            "dd MMMM yyyy",
+            "d MMMM yyyy",
             "dddd dd MMMM yyyy",
             "dddd d MMMM yyyy",
-            "dd MMMM yyyy",
-            "d MMMM yyyy"
+            "dd-MM-yyyy",
+            "yyyy-MM-dd"
         };
-
-        // Strip day-of-week prefix if present (split on first space-digit boundary)
-        var cleaned = System.Text.RegularExpressions.Regex.Replace(text, @"^[A-Za-z]+\s+", "").Trim();
-
-        foreach (var fmt in new[] { "dd MMMM yyyy", "d MMMM yyyy" })
-        {
-            if (DateTime.TryParseExact(cleaned,
-                    fmt,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None,
-                    out date))
-                return true;
-        }
 
         foreach (var fmt in formats)
         {
-            if (DateTime.TryParseExact(text,
+            if (DateTime.TryParseExact(
+                    cleaned,
+                    fmt,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None,
+                    out date))
+                return true;
+
+            if (DateTime.TryParseExact(
+                    text,
                     fmt,
                     System.Globalization.CultureInfo.InvariantCulture,
                     System.Globalization.DateTimeStyles.None,
@@ -296,13 +422,23 @@ public class HistoryResultsHarvester : IDataHarvester
                 return true;
         }
 
-        date = default;
-        return false;
+        // Last resort: let the runtime try
+        return DateTime.TryParse(cleaned, out date) || DateTime.TryParse(text, out date);
     }
 
     private static string BuildMonthUrl(int year, int month)
     {
-        var monthName = new DateTime(year, month, 1).ToString("MMMM").ToLowerInvariant();
-        return $"{BaseUrl}/lotto/{monthName}-{year}";
+        var name = new DateTime(year, month, 1)
+            .ToString("MMMM")
+            .ToLowerInvariant();
+        return $"{BaseUrl}/lotto/{name}-{year}";
+    }
+    #endregion
+
+    private class DrawDto
+    {
+        public string DateText { get; set; } = "";
+        public List<int> Numbers { get; set; } = new();
     }
 }
+

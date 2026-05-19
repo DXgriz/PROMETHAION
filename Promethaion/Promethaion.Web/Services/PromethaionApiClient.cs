@@ -1,5 +1,6 @@
-﻿using static Promethaion.Web.Models.ApiModels;
+﻿using Promethaion.Web.Models;
 using System.Net.Http.Json;
+using static Promethaion.Web.Models.ApiModels;
 
 
 namespace Promethaion.Web.Services;
@@ -50,6 +51,11 @@ public class PromethaionApiClient : IPromethaionApiClient
         return result?.Seeded ?? 0;
     }
 
+    public async Task<HarvestResultDto?> HarvestLatestAsync(string gameName)
+    {
+        return await _http.GetFromJsonAsync<HarvestResultDto>(
+            $"api/events/harvest/latest?gameName={Uri.EscapeDataString(gameName)}");
+    }
     // ── Forecasts ─────────────────────────────────────────────────────────────
 
     public async Task<List<ForecastDto>> GetAllForecastsAsync() =>

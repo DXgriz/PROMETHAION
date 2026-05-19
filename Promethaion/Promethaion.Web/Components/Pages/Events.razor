@@ -1,0 +1,339 @@
+﻿@page "/events"
+@inject IPromethaionApiClient Api
+@inject IToastService Toast
+@using Blazored.Toast.Services
+@using Promethaion.Web.Models
+@using Promethaion.Web.Services
+@using static Promethaion.Web.Models.ApiModels
+
+
+<PageTitle>Pattern Events — Promethaion</PageTitle>
+
+<div class="top-bar">
+    <div class="page-title">PATTERN <span>EVENTS</span></div>
+    <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" @onclick="() => _showAddModal = true">+ Add Draw</button>
+        <button class="btn btn-blue btn-sm" @onclick="() => _showImportModal = true">↑ Import CSV</button>
+        <button class="btn btn-outline btn-sm" @onclick="SeedSampleAsync" disabled="@_seeding">
+            @(_seeding ? "Seeding…" : "⊕ Seed Sample")
+        </button>
+    </div>
+</div>
+
+<div class="page-body">
+
+    @if (_harvesting)
+    {
+        <div class="harvest-banner">
+            <div class="spinner" style="width:16px;height:16px;border-width:2px;"></div>
+            <span>Harvesting data from lotteryresults.co.za — this may take a minute…</span>
+        </div>
+    }
+    @if (_harvestResult is not null)
+    {
+        <div class="harvest-banner harvest-done">
+            ✓ Harvest complete — <strong>@_harvestResult.NewRecords</strong> new records,
+            @_harvestResult.SkippedDuplicates skipped, @_harvestResult.FailedRows failed.
+            <button class="btn btn-outline btn-sm" style="margin-left:12px;"
+                    @onclick="() => _harvestResult = null">Dismiss</button>
+        </div>
+    }
+
+    <div class="stat-grid" style="margin-bottom:20px;">
+        <div class="stat-card" style="--accent:var(--gold)">
+            <div class="stat-label">Total Records</div>
+            <div class="stat-value">@_events.Count.ToString("N0")</div>
+            <div class="stat-sub">@_gameName</div>
+        </div>
+        <div class="stat-card" style="--accent:var(--blue)">
+            <div class="stat-label">Latest Draw</div>
+            <div class="stat-value" style="font-size:16px;padding-top:6px;">
+                @(_events.Count > 0 ? $"#{_events.Last().DrawNumber}" : "—")
+            </div>
+            <div class="stat-sub">
+                @(_events.Count > 0 ? _events.Last().DrawDate.ToString("dd MMM yyyy") : "No data")
+            </div>
+        </div>
+        <div class="stat-card" style="--accent:var(--success-light)">
+            <div class="stat-label">Date Range</div>
+            <div class="stat-value" style="font-size:13px;padding-top:6px;">
+                @(_events.Count > 0 ? _events.First().DrawDate.ToString("MMM yyyy") : "—")
+            </div>
+            <div class="stat-sub">
+                @(_events.Count > 0 ? $"→ {_events.Last().DrawDate:MMM yyyy}" : "")
+            </div>
+        </div>
+        <div class="stat-card" style="--accent:var(--text-dim)">
+            <div class="stat-label">Harvest</div>
+            <div class="stat-value" style="font-size:13px;padding-top:6px;">
+                <button class="btn btn-gold btn-sm" @onclick="HarvestLatestAsync" disabled="@_harvesting">
+                    @(_harvesting ? "Running…" : "⟳ Sync Latest")
+                </button>
+            </div>
+            <div class="stat-sub">Auto-syncs Wed & Sat</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;padding:14px 20px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <input class="search-input" placeholder="Search draw number or date…"
+                   @bind="_searchTerm" @bind:event="oninput" style="flex:1;min-width:200px;" />
+            <select class="search-input" style="width:160px;" @bind="_pageSize">
+                <option value="20">20 per page</option>
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+            </select>
+            <button class="btn btn-outline btn-sm" @onclick="PrevPage" disabled="@(_page == 0)">← Prev</button>
+            <span class="text-muted" style="font-size:12px;">Page @(_page + 1) / @TotalPages</span>
+            <button class="btn btn-outline btn-sm" @onclick="NextPage" disabled="@(_page >= TotalPages - 1)">Next →</button>
+        </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+        @if (_loading)
+        {
+            <div class="loading-overlay"><div class="spinner"></div><span>Loading events…</span></div>
+        }
+        else if (PagedEvents.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">≡</div>
+                <p>No events found. Use <strong>Sync Latest</strong> or <strong>Import CSV</strong> to load data.</p>
+            </div>
+        }
+        else
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Draw #</th><th>Date</th><th>Day</th>
+                        <th>Ball 1</th><th>Ball 2</th><th>Ball 3</th>
+                        <th>Ball 4</th><th>Ball 5</th><th>Ball 6</th>
+                        <th>Bonus</th><th>Sum</th><th>Odd</th><th>Even</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in PagedEvents)
+                    {
+                        <tr>
+                            <td class="text-gold text-mono">#@e.DrawNumber</td>
+                            <td class="text-muted">@e.DrawDate.ToString("dd MMM yyyy")</td>
+                            <td class="text-dim">@e.DrawDate.ToString("ddd")</td>
+                            <td><div class="ball main" style="width:28px;height:28px;font-size:10px;">@e.Ball1</div></td>
+                            <td><div class="ball main" style="width:28px;height:28px;font-size:10px;">@e.Ball2</div></td>
+                            <td><div class="ball main" style="width:28px;height:28px;font-size:10px;">@e.Ball3</div></td>
+                            <td><div class="ball main" style="width:28px;height:28px;font-size:10px;">@e.Ball4</div></td>
+                            <td><div class="ball main" style="width:28px;height:28px;font-size:10px;">@e.Ball5</div></td>
+                            <td><div class="ball main" style="width:28px;height:28px;font-size:10px;">@e.Ball6</div></td>
+                            <td>
+                                @if (e.BonusBall.HasValue)
+                                { <div class="ball bonus" style="width:28px;height:28px;font-size:10px;">@e.BonusBall</div> }
+                            </td>
+                            <td class="text-muted">@e.Sum</td>
+                            <td class="text-gold">@e.OddCount</td>
+                            <td class="text-blue">@e.EvenCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+
+@if (_showAddModal)
+{
+    <div class="modal-backdrop" @onclick="() => _showAddModal = false">
+        <div class="modal-box" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="card-title">Add Draw Result</span>
+                <button class="btn btn-outline btn-sm" @onclick="() => _showAddModal = false">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <label class="form-label">Draw Number</label>
+                    <input class="form-input" type="number" @bind="_newDraw.DrawNumber" />
+                </div>
+                <div class="form-row">
+                    <label class="form-label">Draw Date</label>
+                    <input class="form-input" type="date" @bind="_newDraw.DrawDate" />
+                </div>
+                <div class="form-row">
+                    <label class="form-label">Main Balls (6 numbers)</label>
+                    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">
+                        <input class="form-input" type="number" min="1" max="52" @bind="_newDraw.Ball1" placeholder="B1"/>
+                        <input class="form-input" type="number" min="1" max="52" @bind="_newDraw.Ball2" placeholder="B2"/>
+                        <input class="form-input" type="number" min="1" max="52" @bind="_newDraw.Ball3" placeholder="B3"/>
+                        <input class="form-input" type="number" min="1" max="52" @bind="_newDraw.Ball4" placeholder="B4"/>
+                        <input class="form-input" type="number" min="1" max="52" @bind="_newDraw.Ball5" placeholder="B5"/>
+                        <input class="form-input" type="number" min="1" max="52" @bind="_newDraw.Ball6" placeholder="B6"/>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">Bonus Ball</label>
+                    <input class="form-input" type="number" min="1" max="52" @bind="_newDraw.BonusBall" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => _showAddModal = false">Cancel</button>
+                <button class="btn btn-gold" @onclick="AddDrawAsync" disabled="@_adding">
+                    @(_adding ? "Saving…" : "Save Draw")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showImportModal)
+{
+    <div class="modal-backdrop" @onclick="() => _showImportModal = false">
+        <div class="modal-box" @onclick:stopPropagation>
+            <div class="modal-header">
+                <span class="card-title">Import CSV</span>
+                <button class="btn btn-outline btn-sm" @onclick="() => _showImportModal = false">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:12px;margin-bottom:12px;">
+                    CSV format: <code>DrawNumber, DrawDate, Ball1, Ball2, Ball3, Ball4, Ball5, Ball6, BonusBall</code>
+                </p>
+                <InputFile OnChange="HandleFileSelected" accept=".csv" class="form-input" />
+                @if (_importResult is not null)
+                {
+                    <div style="margin-top:12px;" class="text-success">
+                        ✓ Imported @_importResult.Value.Imported records (@_importResult.Value.Skipped skipped)
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" @onclick="() => _showImportModal = false">Close</button>
+                <button class="btn btn-gold" @onclick="ImportCsvAsync"
+                        disabled="@(_csvFile == null || _importing)">
+                    @(_importing ? "Importing…" : "Import")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .harvest-banner { display:flex; align-items:center; gap:10px; background:var(--bg-panel); border:1px solid var(--border-bright); border-radius:var(--radius); padding:12px 16px; margin-bottom:16px; font-size:13px; color:var(--text-secondary); }
+    .harvest-done   { border-color:var(--success); color:var(--success-light); }
+    .search-input   { background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius); padding:8px 12px; color:var(--text-primary); font-size:13px; outline:none; }
+    .search-input:focus { border-color:var(--gold); }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:200; }
+    .modal-box      { background:var(--bg-card); border:1px solid var(--border-bright); border-radius:var(--radius-lg); width:480px; max-width:90vw; }
+    .modal-header   { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); }
+    .modal-body     { padding:20px; }
+    .modal-footer   { display:flex; justify-content:flex-end; gap:8px; padding:16px 20px; border-top:1px solid var(--border); }
+    .form-row       { margin-bottom:14px; }
+    .form-label     { display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px; }
+    .form-input     { width:100%; background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius); padding:8px 12px; color:var(--text-primary); font-size:13px; outline:none; }
+    .form-input:focus { border-color:var(--gold); }
+</style>
+
+@code {
+    private List<PatternEventDto>    _events          = [];
+    private bool                     _loading         = true;
+    private bool                     _seeding         = false;
+    private bool                     _harvesting      = false;
+    private bool                     _adding          = false;
+    private bool                     _importing       = false;
+    private bool                     _showAddModal    = false;
+    private bool                     _showImportModal = false;
+    private string                   _gameName        = "SA Lotto";
+    private string                   _searchTerm      = "";
+    private int                      _page            = 0;
+    private int                      _pageSize        = 50;
+    private HarvestResultDto?        _harvestResult;
+    private (int Imported, int Skipped)? _importResult;
+    private IBrowserFile?            _csvFile;
+
+    private AddPatternEventDto _newDraw = new();
+
+    private List<PatternEventDto> FilteredEvents => string.IsNullOrWhiteSpace(_searchTerm)
+        ? _events
+        : _events.Where(e =>
+            e.DrawNumber.ToString().Contains(_searchTerm) ||
+            e.DrawDate.ToString("dd MMM yyyy")
+             .Contains(_searchTerm, StringComparison.OrdinalIgnoreCase))
+          .ToList();
+
+    private int TotalPages =>
+        Math.Max(1, (int)Math.Ceiling(FilteredEvents.Count / (double)_pageSize));
+
+    private List<PatternEventDto> PagedEvents =>
+        FilteredEvents.Skip(_page * _pageSize).Take(_pageSize).ToList();
+
+    protected override async Task OnInitializedAsync() => await LoadEventsAsync();
+
+    private async Task LoadEventsAsync()
+    {
+        _loading = true;
+        try   { _events = await Api.GetAllEventsAsync(_gameName); }
+        finally { _loading = false; }
+    }
+
+    private async Task HarvestLatestAsync()
+    {
+        _harvesting    = true;
+        _harvestResult = null;
+        try
+        {
+            var result     = await Api.HarvestLatestAsync(_gameName);
+            _harvestResult = result;
+            await LoadEventsAsync();
+            Toast.ShowSuccess($"Synced {result?.NewRecords ?? 0} new records.");
+        }
+        catch { Toast.ShowError("Harvest failed. Check API logs."); }
+        finally { _harvesting = false; }
+    }
+
+    private async Task SeedSampleAsync()
+    {
+        _seeding = true;
+        try
+        {
+            var seeded = await Api.SeedSampleDataAsync(300, _gameName);
+            await LoadEventsAsync();
+            Toast.ShowSuccess($"Seeded {seeded} sample records.");
+        }
+        catch { Toast.ShowError("Seeding failed."); }
+        finally { _seeding = false; }
+    }
+
+    private async Task AddDrawAsync()
+    {
+        _adding = true;
+        try
+        {
+            await Api.AddEventAsync(_newDraw);
+            await LoadEventsAsync();
+            _showAddModal = false;
+            Toast.ShowSuccess("Draw added successfully.");
+            _newDraw = new();
+        }
+        catch { Toast.ShowError("Failed to add draw."); }
+        finally { _adding = false; }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e) => _csvFile = e.File;
+
+    private async Task ImportCsvAsync()
+    {
+        if (_csvFile is null) return;
+        _importing = true;
+        try
+        {
+            await using var stream = _csvFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            var result     = await Api.ImportCsvAsync(stream, _csvFile.Name, _gameName);
+            _importResult  = result;
+            await LoadEventsAsync();
+            Toast.ShowSuccess($"Imported {result.Imported} records.");
+        }
+        catch { Toast.ShowError("Import failed. Check CSV format."); }
+        finally { _importing = false; }
+    }
+
+    private void PrevPage() { if (_page > 0) _page--; }
+    private void NextPage() { if (_page < TotalPages - 1) _page++; }
+}

@@ -1,23 +1,31 @@
-﻿using Promethaion.Core.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Promethaion.Core.Interfaces;
+using Promethaion.Data.Repositories;
 
-namespace Promethaion.API.BackgroundServices;
+namespace Promethaion.Data.Harvesters;
 
 /// <summary>
-/// Hosted background service that:
-///   1. On startup: runs a full historical sync if the DB has fewer than 50 records.
-///   2. Every Wednesday and Saturday at 22:00 SAST: syncs the latest month
-///      to pick up new draws automatically after they are published.
+/// On startup: full sync if DB has fewer than 50 records, else latest-only.
+/// On schedule: syncs every Wednesday and Saturday after 21:00 SAST,
+/// then raises OnHarvestCompleted so TrainingBackgroundService retrains.
 /// </summary>
 public class HarvestBackgroundService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<HarvestBackgroundService> _log;
 
-    // SA Lotto draws on Wednesdays and Saturdays.
-    private static readonly DayOfWeek[] DrawDays = [DayOfWeek.Wednesday, DayOfWeek.Saturday];
+    private static readonly DayOfWeek[] DrawDays =
+        [DayOfWeek.Wednesday, DayOfWeek.Saturday];
+
+    private DateTime _lastSyncDate = DateTime.MinValue.Date;
+
+    /// <summary>
+    /// Raised after a successful harvest that produced new records.
+    /// TrainingBackgroundService subscribes to this to trigger retraining.
+    /// </summary>
+    public event Func<int, Task>? OnHarvestCompleted;
 
     public HarvestBackgroundService(
         IServiceScopeFactory scopeFactory,
@@ -27,22 +35,15 @@ public class HarvestBackgroundService : BackgroundService
         _log = log;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        // Allow the web server to finish starting up first.
-        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+        await Task.Delay(TimeSpan.FromSeconds(8), ct);
+        await RunStartupSyncAsync(ct);
 
-        await RunStartupSyncAsync(stoppingToken);
-
-        // Poll every 30 minutes and check if it's a draw day past 22:00 SAST.
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(30));
-        while (await timer.WaitForNextTickAsync(stoppingToken))
-        {
-            await CheckScheduledSyncAsync(stoppingToken);
-        }
+        while (await timer.WaitForNextTickAsync(ct))
+            await CheckScheduledSyncAsync(ct);
     }
-
-    // ── Startup ───────────────────────────────────────────────────────────────
 
     private async Task RunStartupSyncAsync(CancellationToken ct)
     {
@@ -51,60 +52,60 @@ public class HarvestBackgroundService : BackgroundService
         var harvester = scope.ServiceProvider.GetRequiredService<IDataHarvester>();
 
         int existing = await repo.CountAsync("SA Lotto");
+        _log.LogInformation("[HarvestService] DB has {Count} records.", existing);
 
-        if (existing < 50)
-        {
-            _log.LogInformation(
-                "[HarvestService] Only {Count} records in DB — running full historical sync.",
-                existing);
+        var result = existing < 50
+            ? await harvester.SyncAsync("SA Lotto", ct)
+            : await harvester.SyncLatestAsync("SA Lotto", ct);
 
-            var result = await harvester.SyncAsync("SA Lotto", ct);
-            LogResult(result);
-        }
-        else
-        {
-            _log.LogInformation(
-                "[HarvestService] DB has {Count} records — skipping full sync, running latest only.",
-                existing);
+        LogResult(result);
 
-            var result = await harvester.SyncLatestAsync("SA Lotto", ct);
-            LogResult(result);
-        }
+        if (result.NewRecords > 0)
+            await RaiseHarvestCompleted(result.NewRecords);
     }
-
-    // ── Scheduled ─────────────────────────────────────────────────────────────
 
     private async Task CheckScheduledSyncAsync(CancellationToken ct)
     {
-        // Convert UTC to SAST (UTC+2).
-        var sast = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
-            TimeZoneInfo.FindSystemTimeZoneById("South Africa Standard Time"));
-
-        bool isDrawDay = DrawDays.Contains(sast.DayOfWeek);
-        bool isAfter22 = sast.Hour >= 22;
-
-        if (!isDrawDay || !isAfter22) return;
-
-        // Avoid double-syncing the same day — check if we already synced today.
+        var sast = ToSast(DateTime.UtcNow);
+        if (!DrawDays.Contains(sast.DayOfWeek)) return;
+        if (sast.Hour < 21) return;
         if (_lastSyncDate == sast.Date) return;
 
-        _log.LogInformation(
-            "[HarvestService] Scheduled sync triggered ({Day} {Time} SAST)",
+        _log.LogInformation("[HarvestService] Scheduled sync — {Day} {Time} SAST",
             sast.DayOfWeek, sast.ToString("HH:mm"));
 
         using var scope = _scopeFactory.CreateScope();
         var harvester = scope.ServiceProvider.GetRequiredService<IDataHarvester>();
-
         var result = await harvester.SyncLatestAsync("SA Lotto", ct);
-        LogResult(result);
 
+        LogResult(result);
         _lastSyncDate = sast.Date;
+
+        if (result.NewRecords > 0)
+            await RaiseHarvestCompleted(result.NewRecords);
     }
 
-    private DateTime _lastSyncDate = DateTime.MinValue.Date;
+    private async Task RaiseHarvestCompleted(int newRecords)
+    {
+        if (OnHarvestCompleted is not null)
+        {
+            _log.LogInformation("[HarvestService] Signalling training — {N} new records.", newRecords);
+            await OnHarvestCompleted(newRecords);
+        }
+    }
 
     private void LogResult(HarvestResult r) =>
         _log.LogInformation(
-            "[HarvestService] Harvest complete — New: {New}, Skipped: {Skip}, Failed: {Fail}",
+            "[HarvestService] New={N}  Skipped={S}  Failed={F}",
             r.NewRecords, r.SkippedDuplicates, r.FailedRows);
+
+    private static DateTime ToSast(DateTime utc)
+    {
+        try
+        {
+            return TimeZoneInfo.ConvertTimeFromUtc(utc,
+                TimeZoneInfo.FindSystemTimeZoneById("South Africa Standard Time"));
+        }
+        catch { return utc.AddHours(2); }
+    }
 }

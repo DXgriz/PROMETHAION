@@ -12,6 +12,7 @@
           "Microsoft.ML": "5.0.0",
           "Microsoft.ML.FastTree": "5.0.0",
           "Microsoft.ML.LightGbm": "5.0.0",
+          "Microsoft.Playwright": "1.59.0",
           "Promethaion.Core": "1.0.0"
         },
         "runtime": {
@@ -298,6 +299,17 @@
           }
         }
       },
+      "Microsoft.Playwright/1.59.0": {
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "9.0.4"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Microsoft.Playwright.dll": {
+            "assemblyVersion": "1.59.0.0",
+            "fileVersion": "1.59.0.0"
+          }
+        }
+      },
       "Newtonsoft.Json/13.0.3": {
         "runtime": {
           "lib/net6.0/Newtonsoft.Json.dll": {
@@ -323,6 +335,9 @@
         }
       },
       "Promethaion.Core/1.0.0": {
+        "dependencies": {
+          "Microsoft.Playwright": "1.59.0"
+        },
         "runtime": {
           "Promethaion.Core.dll": {
             "assemblyVersion": "1.0.0.0",
@@ -428,6 +443,13 @@
       "sha512": "sha512-IYAeDalw02exK9i510m9zc625CxZVfWVMJlbvnfIj7NBF6tUm8XzWQ7C6uXJr2SdK14/6SZqGDiFHVeU4G5A/g==",
       "path": "microsoft.ml.lightgbm/5.0.0",
       "hashPath": "microsoft.ml.lightgbm.5.0.0.nupkg.sha512"
+    },
+    "Microsoft.Playwright/1.59.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-igqHbZMmXI6cYNPg1X1o5/51U3CQp83lvvov/d/zmus2wlG1LjvpEL6i1Jx51pRahPtSyppvwq+ZoBfxeSjiew==",
+      "path": "microsoft.playwright/1.59.0",
+      "hashPath": "microsoft.playwright.1.59.0.nupkg.sha512"
     },
     "Newtonsoft.Json/13.0.3": {
       "type": "package",

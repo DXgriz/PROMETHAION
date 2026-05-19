@@ -50,7 +50,7 @@ public class PipelineTrainer
             try
             {
                 var metrics = await pipeline.TrainAsync(history, ct);
-                metrics.ModelVersion = $"{pipeline.PipelineName}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+                metrics.ModelVersion = $"{pipeline.PipelineName}-{DateTime.Now:yyyyMMddHHmmss}";
 
                 // Compare with current best.
                 var best = await _metricsRepo.GetBestAsync(pipeline.PipelineName);

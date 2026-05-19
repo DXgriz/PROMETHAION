@@ -56,4 +56,19 @@ public class DTOs
         string LatestModelVersion);
 
 
+public class PredictionResult
+{
+    public string GameName { get; set; } = "";
+
+    public List<int> MainBalls { get; set; } = new();
+
+    public int BonusBall { get; set; }
+
+    public double Confidence { get; set; }
+
+    public DateTime GeneratedAt { get; set; }
+
+    // Optional but powerful for UI/debugging
+    public Dictionary<int, double> Scores { get; set; } = new();
+}
 }

@@ -22,14 +22,28 @@ namespace Promethaion.ML.Pipelines
         protected override IEstimator<ITransformer> BuildTrainer()
         {
             // Binary classification: was this ball drawn (1) or not (0)?
-            var calibratedTrainer = Mlc.BinaryClassification.Trainers.SdcaLogisticRegression(
-                labelColumnName: "Label",
-                featureColumnName: "Features",
-                maximumNumberOfIterations: 100);
+            //var calibratedTrainer = Mlc.BinaryClassification.Trainers.SdcaLogisticRegression(
+
+
+            // Regression: predicts likelihood score that a ball will be drawn
+
+            //var calibratedTrainer = Mlc.Regression.Trainers.Sdca(
+            //    labelColumnName: "Label",
+            //    featureColumnName: "Features",
+            //    maximumNumberOfIterations: 100);
+
+
+            var trainer = Mlc.Regression.Trainers.FastTree(
+                    labelColumnName: "Label",
+                    featureColumnName: "Features",
+                    numberOfTrees: 200,
+                    numberOfLeaves: 64,
+                    minimumExampleCountPerLeaf: 10);
+
 
             // Wrap in a regression-compatible scorer so the base class can call
             // Regression.Evaluate and ScoreBallsAsync uniformly.
-            return calibratedTrainer;
+            return trainer;
         }
 
         //public override async Task<Dictionary<int, double>> ScoreBallsAsync(

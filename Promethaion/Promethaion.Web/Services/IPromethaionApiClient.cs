@@ -1,4 +1,5 @@
-﻿using static Promethaion.Web.Models.ApiModels;
+﻿using Promethaion.Web.Models;
+using static Promethaion.Web.Models.ApiModels;
 
 namespace Promethaion.Web.Services
 {
@@ -12,8 +13,10 @@ namespace Promethaion.Web.Services
             Task<(int Imported, int Skipped)> ImportCsvAsync(Stream fileStream, string fileName, string gameName = "SA Lotto");
             Task<int> SeedSampleDataAsync(int drawCount = 200, string gameName = "SA Lotto");
 
-            // Forecasts
-            Task<List<ForecastDto>> GetAllForecastsAsync();
+        Task<HarvestResultDto?> HarvestLatestAsync(string gameName);
+
+        // Forecasts
+        Task<List<ForecastDto>> GetAllForecastsAsync();
             Task<ForecastDto?> GetLatestForecastAsync();
             Task<ForecastDto?> GenerateForecastAsync(string gameName = "SA Lotto");
             Task<List<BallScoreDto>> GetBallScoresAsync(string gameName = "SA Lotto");

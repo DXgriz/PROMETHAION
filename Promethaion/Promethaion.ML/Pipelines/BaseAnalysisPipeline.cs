@@ -39,6 +39,7 @@ public abstract class BaseAnalysisPipeline : IAnalysisPipeline
     protected static readonly string[] FeatureColumns =
     [
         nameof(FeatureVector.BallNumber),
+        nameof(FeatureVector.DrawIndex),
         nameof(FeatureVector.DayOfWeek),
         nameof(FeatureVector.WeekOfYear),
         nameof(FeatureVector.MonthOfYear),
@@ -59,13 +60,15 @@ public abstract class BaseAnalysisPipeline : IAnalysisPipeline
     {
         await Task.Yield(); // yield so caller's UI can update
 
-        var rows = FeatureExtractor.BuildTrainingRows(history);
+        var orderedHistory = history.OrderBy(h => h.DrawDate).ToList();
+        var rows = FeatureExtractor.BuildTrainingRows(orderedHistory);
+
         var dataView = Mlc.Data.LoadFromEnumerable(rows);
 
         // 80 / 20 split.
         var split = Mlc.Data.TrainTestSplit(dataView, testFraction: 0.2, seed: 42);
 
-        var featurisePipeline = Mlc.Transforms.Concatenate("Features", FeatureColumns);
+        var featurisePipeline = Mlc.Transforms.Concatenate("Features", FeatureColumns).Append(Mlc.Transforms.NormalizeMinMax("Features"));
         var fullPipeline = featurisePipeline.Append(BuildTrainer());
 
         _model = fullPipeline.Fit(split.TrainSet);
@@ -76,7 +79,7 @@ public abstract class BaseAnalysisPipeline : IAnalysisPipeline
         var metrics = new TrainingMetrics
         {
             PipelineName = PipelineName,
-            ModelVersion = $"v{DateTime.UtcNow:yyyyMMddHHmmss}",
+            ModelVersion = $"v{DateTime.Now:yyyyMMddHHmmss}",
             TrainingSetSize = (int)(rows.Count * 0.8),
             TestSetSize = (int)(rows.Count * 0.2),
         };
@@ -110,20 +113,68 @@ public abstract class BaseAnalysisPipeline : IAnalysisPipeline
     {
         if (_model is null) await LoadModelAsync(ct);
 
-        var scores = new Dictionary<int, double>();
+        //var scores = new Dictionary<int, double>();
+        //var engine = Mlc.Model.CreatePredictionEngine<FeatureVector, ScoredOutcome>(_model!);
+
+        //for (int ball = FeatureExtractor.MinBall; ball <= FeatureExtractor.MaxBall; ball++)
+        //{
+        //    var row = FeatureExtractor.BuildInferenceRow(history, ball);
+        //    var output = engine.Predict(row);
+        //    // Clamp to [0,1] — raw regression scores may exceed bounds.
+        //    scores[ball] = Math.Clamp(output.Score, 0.0, 1.0);
+        //}
+        var rawScores = new Dictionary<int, double>();
         var engine = Mlc.Model.CreatePredictionEngine<FeatureVector, ScoredOutcome>(_model!);
 
         for (int ball = FeatureExtractor.MinBall; ball <= FeatureExtractor.MaxBall; ball++)
         {
             var row = FeatureExtractor.BuildInferenceRow(history, ball);
             var output = engine.Predict(row);
-            // Clamp to [0,1] — raw regression scores may exceed bounds.
-            scores[ball] = Math.Clamp(output.Score, 0.0, 1.0);
+
+            rawScores[ball] = output.Score;
         }
 
+        var min = rawScores.Values.Min();
+        var max = rawScores.Values.Max();
+
+        var scores = rawScores.ToDictionary(
+            kvp => kvp.Key,
+            kvp => max == min ? 0.5 : (kvp.Value - min) / (max - min)
+        );
         return scores;
     }
 
+    public async Task<List<(int Ball, double Score)>> PredictTopBallsAsync(
+    IReadOnlyList<PatternEvent> history,
+    CancellationToken ct = default)
+    {
+        var scores = await ScoreBallsAsync(history, ct);
+
+        return scores
+            .OrderByDescending(x => x.Value)
+            .Take(6)
+            .Select(x => (Ball: x.Key, Score: x.Value))
+            .ToList();
+    }
+
+    public async Task<(List<int> MainBalls, int BonusBall)> PredictDrawAsync(
+    IReadOnlyList<PatternEvent> history,
+    CancellationToken ct = default)
+    {
+        var scores = await ScoreBallsAsync(history, ct);
+
+        var ordered = scores.OrderByDescending(x => x.Value).ToList();
+
+        var mainBalls = ordered
+            .Take(6)
+            .Select(x => x.Key)
+            .OrderBy(x => x)
+            .ToList();
+
+        var bonusBall = ordered.Skip(6).First().Key;
+
+        return (mainBalls, bonusBall);
+    }
     public async Task SaveModelAsync(CancellationToken ct = default)
     {
         if (_model is null) return;

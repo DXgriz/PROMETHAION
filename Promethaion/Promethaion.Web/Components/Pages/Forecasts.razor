@@ -1,0 +1,255 @@
+﻿@page "/forecasts"
+@inject IPromethaionApiClient Api
+@inject IToastService Toast
+@using Blazored.Toast.Services
+@using Promethaion.Web.Models
+@using Promethaion.Web.Services
+@using static Promethaion.Web.Models.ApiModels
+
+<PageTitle>Forecasts — Promethaion</PageTitle>
+
+<div class="top-bar">
+    <div class="page-title">FORE<span>CASTS</span></div>
+    <button class="btn btn-gold" @onclick="GenerateForecastAsync" disabled="@_generating">
+        @(_generating ? "Generating…" : "⬡ Generate Forecast")
+    </button>
+</div>
+
+<div class="page-body">
+    @if (_loading)
+    {
+        <div class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
+    }
+    else
+    {
+        <!-- Latest forecast hero -->
+        @if (_latestForecast is not null)
+        {
+            <div class="forecast-hero">
+                <div class="forecast-hero-left">
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+                        <span class="badge badge-gold">Draw #@_latestForecast.TargetDrawNumber</span>
+                        <span class="badge badge-blue">@(_latestForecast.ConfidenceScore.ToString("P1")) confidence</span>
+                        <span class="badge badge-dim">v@_latestForecast.ModelVersion</span>
+                        @if (_latestForecast.MatchCount.HasValue)
+                        { <span class="badge badge-@(_latestForecast.MatchCount >= 3 ? "green" : "dim")">@_latestForecast.MatchCount / 6 matched</span> }
+                    </div>
+                    <div class="ball-row" style="margin-bottom:16px;">
+                        @foreach (var b in new[]{_latestForecast.Ball1,_latestForecast.Ball2,_latestForecast.Ball3,
+                                                 _latestForecast.Ball4,_latestForecast.Ball5,_latestForecast.Ball6})
+                        { <div class="ball main" style="width:48px;height:48px;font-size:15px;">@b</div> }
+                        @if (_latestForecast.BonusBall.HasValue)
+                        {
+                            <span class="text-dim" style="align-self:center;">+</span>
+                            <div class="ball bonus" style="width:48px;height:48px;font-size:15px;">@_latestForecast.BonusBall</div>
+                        }
+                    </div>
+                    <div class="text-dim" style="font-size:11px;">
+                        Generated @_latestForecast.GeneratedAt.ToString("dd MMM yyyy · HH:mm") &nbsp;·&nbsp;
+                        Target draw: #@_latestForecast.TargetDrawNumber
+                    </div>
+                </div>
+
+                <!-- Per-ball confidence bars -->
+                @if (_latestForecast.PerBallConfidence.Any())
+                {
+                    <div class="forecast-hero-right">
+                        <div class="card-title" style="margin-bottom:10px;">Per-ball confidence</div>
+                        @foreach (var kv in _latestForecast.PerBallConfidence.OrderByDescending(x => x.Value).Take(6))
+                        {
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+                                <div class="ball main" style="width:26px;height:26px;font-size:10px;flex-shrink:0;">@kv.Key</div>
+                                <div class="progress-track" style="flex:1;">
+                                    <div class="progress-fill" style="width:@((kv.Value * 100).ToString("F0"))%"></div>
+                                </div>
+                                <span style="font-size:11px;color:var(--text-dim);width:36px;text-align:right;">@((kv.Value * 100).ToString("F0"))%</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Evaluate form -->
+        @if (_latestForecast is not null && !_latestForecast.MatchCount.HasValue)
+        {
+            <div class="card section-gap">
+                <div class="card-header"><span class="card-title">Evaluate Against Actual Draw</span></div>
+                <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+                    <div>
+                        <div class="text-dim" style="font-size:11px;margin-bottom:6px;letter-spacing:1px;">ACTUAL DRAW NUMBER</div>
+                        <input class="ev-input" type="number" @bind="_evalDrawNumber" placeholder="e.g. 2415" />
+                    </div>
+                    <button class="btn btn-blue" @onclick="EvaluateAsync" disabled="@(_evalDrawNumber == 0 || _evaluating)">
+                        @(_evaluating ? "Evaluating…" : "▶ Evaluate")
+                    </button>
+                </div>
+                @if (_evalResult is not null)
+                {
+                    <div style="margin-top:14px;padding:14px;background:var(--bg-panel);border-radius:var(--radius);border:1px solid var(--border);">
+                        <span class="text-success">✓ Match count: <strong>@_evalResult</strong> / 6</span>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Ball scores heat map -->
+        <div class="card section-gap">
+            <div class="card-header">
+                <span class="card-title">All Ball Scores — Ensemble Ranking</span>
+                <button class="btn btn-outline btn-sm" @onclick="LoadBallScoresAsync" disabled="@_loadingScores">
+                    @(_loadingScores ? "Loading…" : "⟳ Refresh")
+                </button>
+            </div>
+            @if (_ballScores.Count == 0)
+            {
+                <div class="empty-state">
+                    <p>No scores yet — generate a forecast or click Refresh.</p>
+                </div>
+            }
+            else
+            {
+                <div class="ball-score-grid">
+                    @foreach (var s in _ballScores)
+                    {
+                        var intensity = Math.Min(s.Score / _maxScore, 1.0);
+                        var isTop6 = s.Rank <= 6;
+                        <div class="ball-score-cell @(isTop6 ? "top6" : "")">
+                            <div class="ball @(isTop6 ? "main" : "cold")" style="width:34px;height:34px;font-size:12px;">@s.Ball</div>
+                            <div class="ball-score-bar">
+                                <div class="ball-score-fill" style="width:@((intensity * 100).ToString("F0"))%;background:@(isTop6 ? "var(--gold)" : "var(--blue-dim)")"></div>
+                            </div>
+                            <div style="font-size:10px;color:var(--text-dim);">#@s.Rank</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- All forecasts table -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Forecast History</span>
+                <span class="badge badge-dim">@_allForecasts.Count total</span>
+            </div>
+            @if (_allForecasts.Count == 0)
+            {
+                <div class="empty-state"><p>No forecasts yet.</p></div>
+            }
+            else
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Draw #</th><th>Generated</th><th>Numbers</th><th>Bonus</th><th>Confidence</th><th>Match</th><th>Version</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in _allForecasts)
+                        {
+                            <tr>
+                                <td class="text-gold text-mono">#@f.TargetDrawNumber</td>
+                                <td class="text-muted">@f.GeneratedAt.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    <div class="ball-row">
+                                        @foreach (var b in new[]{f.Ball1,f.Ball2,f.Ball3,f.Ball4,f.Ball5,f.Ball6})
+                                        { <div class="ball main" style="width:26px;height:26px;font-size:10px;">@b</div> }
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (f.BonusBall.HasValue)
+                                    { <div class="ball bonus" style="width:26px;height:26px;font-size:10px;">@f.BonusBall</div> }
+                                </td>
+                                <td class="text-gold">@(f.ConfidenceScore.ToString("P1"))</td>
+                                <td>
+                                    @if (f.MatchCount.HasValue)
+                                    { <span class="badge badge-@(f.MatchCount >= 3 ? "green" : "dim")">@f.MatchCount / 6</span> }
+                                    else { <span class="badge badge-dim">Pending</span> }
+                                </td>
+                                <td class="text-dim" style="font-size:11px;">@f.ModelVersion</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .forecast-hero{background:var(--bg-card);border:1px solid var(--border);border-top:2px solid var(--gold);border-radius:var(--radius-lg);padding:24px;display:flex;gap:32px;margin-bottom:20px;}
+    .forecast-hero-left{flex:1;}
+    .forecast-hero-right{width:260px;flex-shrink:0;border-left:1px solid var(--border);padding-left:24px;}
+    .ev-input{background:var(--bg-panel);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;color:var(--text-primary);font-size:13px;width:180px;outline:none;}
+    .ev-input:focus{border-color:var(--gold);}
+    .ball-score-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;}
+    .ball-score-cell{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px;background:var(--bg-panel);border-radius:var(--radius);border:1px solid var(--border);}
+    .ball-score-cell.top6{border-color:var(--gold-dim);background:rgba(200,128,40,0.06);}
+    .ball-score-bar{width:100%;height:4px;background:var(--bg-deep);border-radius:2px;overflow:hidden;}
+    .ball-score-fill{height:100%;border-radius:2px;transition:width 0.3s ease;}
+    @@media(max-width:900px){.forecast-hero{flex-direction:column;}.forecast-hero-right{width:100%;border-left:none;border-top:1px solid var(--border);padding-left:0;padding-top:16px;}}
+</style>
+
+@code {
+    private List<ForecastDto>  _allForecasts = [];
+    private List<BallScoreDto> _ballScores   = [];
+    private ForecastDto?       _latestForecast;
+    private bool               _loading       = true;
+    private bool               _generating    = false;
+    private bool               _loadingScores = false;
+    private bool               _evaluating    = false;
+    private int                _evalDrawNumber = 0;
+    private int?               _evalResult;
+    private double             _maxScore => _ballScores.Count > 0 ? _ballScores.Max(s => s.Score) : 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Task.WhenAll(
+                Api.GetAllForecastsAsync().ContinueWith(t  => _allForecasts    = t.Result),
+                Api.GetLatestForecastAsync().ContinueWith(t => _latestForecast = t.Result),
+                Api.GetBallScoresAsync().ContinueWith(t    => _ballScores      = t.Result)
+            );
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task GenerateForecastAsync()
+    {
+        _generating = true;
+        try
+        {
+            var f = await Api.GenerateForecastAsync();
+            if (f is not null)
+            {
+                _latestForecast = f;
+                _allForecasts.Insert(0, f);
+                await LoadBallScoresAsync();
+                Toast.ShowSuccess($"Forecast generated for Draw #{f.TargetDrawNumber}");
+            }
+        }
+        catch { Toast.ShowError("Failed to generate forecast. Ensure models are trained."); }
+        finally { _generating = false; }
+    }
+
+    private async Task LoadBallScoresAsync()
+    {
+        _loadingScores = true;
+        try { _ballScores = await Api.GetBallScoresAsync(); }
+        finally { _loadingScores = false; }
+    }
+
+    private async Task EvaluateAsync()
+    {
+        if (_latestForecast is null || _evalDrawNumber == 0) return;
+        _evaluating = true;
+        try
+        {
+            await Api.EvaluateForecastAsync(_latestForecast.Id, _evalDrawNumber);
+            _latestForecast = await Api.GetLatestForecastAsync();
+            _evalResult = _latestForecast?.MatchCount;
+            Toast.ShowSuccess($"Evaluated — {_evalResult} balls matched.");
+        }
+        catch { Toast.ShowError("Evaluation failed. Check the draw number."); }
+        finally { _evaluating = false; }
+    }
+}

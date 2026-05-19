@@ -8,205 +8,152 @@
 
 <div class="top-bar">
     <div class="page-title">DASH<span>BOARD</span></div>
-    <div style="display:flex; gap:10px; align-items:center;">
-        @if (_status?.ShouldRetrain == true)
-        {
-            <span class="badge badge-red">⚠ Retrain Recommended</span>
-        }
+    <div style="display:flex;gap:8px;align-items:center;">
         @if (_status?.ModelsLoaded == true)
-        {
-            <span class="badge badge-green">Models Loaded</span>
-        }
-        else
-        {
-            <span class="badge badge-dim">Models Not Loaded</span>
-        }
+        { <span class="badge badge-green">● Models Active</span> }
+        else { <span class="badge badge-dim">○ Models Inactive</span> }
+        @if (_status?.ShouldRetrain == true)
+        { <span class="badge badge-red">⚠ Retrain Needed</span> }
     </div>
 </div>
 
 <div class="page-body">
-
     @if (_loading)
     {
-        <div class="loading-overlay">
-            <div class="spinner"></div>
-            <span>Loading system status…</span>
-        </div>
+        <div class="loading-overlay"><div class="spinner"></div><span>Loading…</span></div>
     }
     else
     {
-        <!-- Stat Cards -->
         <div class="stat-grid">
-            <div class="stat-card" style="--accent: var(--gold)">
+            <div class="stat-card" style="--accent:var(--gold)">
                 <div class="stat-label">Pattern Events</div>
-                <div class="stat-value">@(_status?.TotalDraws.ToString("N0") ?? "—")</div>
+                <div class="stat-value">@(_status?.TotalDraws.ToString("N0") ?? "0")</div>
                 <div class="stat-sub">Historical records</div>
             </div>
-            <div class="stat-card" style="--accent: var(--blue)">
-                <div class="stat-label">Total Forecasts</div>
+            <div class="stat-card" style="--accent:var(--blue)">
+                <div class="stat-label">Forecasts</div>
                 <div class="stat-value">@(_status?.TotalPredictions ?? 0)</div>
                 <div class="stat-sub">@(_status?.EvaluatedPredictions ?? 0) evaluated</div>
             </div>
-            <div class="stat-card" style="--accent: var(--success-light)">
+            <div class="stat-card" style="--accent:var(--success-light)">
                 <div class="stat-label">Rolling Accuracy</div>
-                <div class="stat-value text-success">@(_status?.RollingAccuracy.ToString("F2") ?? "—")</div>
+                <div class="stat-value text-success">@(_status?.RollingAccuracy.ToString("F2") ?? "0.00")</div>
                 <div class="stat-sub">avg matches / forecast</div>
             </div>
-            <div class="stat-card" style="--accent: var(--text-dim)">
+            <div class="stat-card" style="--accent:var(--text-dim)">
                 <div class="stat-label">Model Version</div>
-                <div class="stat-value" style="font-size:14px; padding-top:6px;">@(_status?.LatestModelVersion ?? "untrained")</div>
+                <div class="stat-value" style="font-size:13px;padding-top:8px;">@(_status?.LatestModelVersion ?? "untrained")</div>
                 <div class="stat-sub">
                     @if (_status?.LastTrainedAt.HasValue == true)
-                    {
-                        <span>Last trained @_status.LastTrainedAt.Value.ToString("dd MMM yyyy")</span>
-                    }
-                    else
-                    {
-
-                        <span>Never trained</span>
-                    }
+                    { @_status.LastTrainedAt.Value.ToString("dd MMM yyyy") }
+                    else { <span>Never trained</span> }
                 </div>
             </div>
         </div>
 
-        <!-- Latest Forecast -->
-        <div class="section-gap grid-2">
+        <div class="grid-2 section-gap">
             <div class="card">
                 <div class="card-header">
                     <span class="card-title">Latest Forecast</span>
-                    <a href="/forecasts" class="btn btn-outline btn-sm">View All</a>
+                    <a href="/forecasts" class="btn btn-outline btn-sm">View All →</a>
                 </div>
-
                 @if (_latestForecast is null)
                 {
                     <div class="empty-state">
                         <div class="empty-icon">◎</div>
-                        <p>No forecasts generated yet.</p>
+                        <p>No forecasts yet.</p>
+                        <a href="/forecasts" class="btn btn-gold btn-sm" style="margin-top:12px;">Generate First Forecast</a>
                     </div>
                 }
                 else
                 {
-                    <div style="margin-bottom:16px;">
-                        <div style="font-size:11px; color:var(--text-dim); margin-bottom:10px; letter-spacing:1px;">
-                            DRAW #@_latestForecast.TargetDrawNumber &nbsp;·&nbsp;
-                            @_latestForecast.GeneratedAt.ToString("dd MMM yyyy HH:mm") &nbsp;·&nbsp;
-                            <span class="text-gold">@(_latestForecast.ConfidenceScore.ToString("P1")) confidence</span>
-                        </div>
-                        <div class="ball-row">
-                            <div class="ball main">@_latestForecast.Ball1</div>
-                            <div class="ball main">@_latestForecast.Ball2</div>
-                            <div class="ball main">@_latestForecast.Ball3</div>
-                            <div class="ball main">@_latestForecast.Ball4</div>
-                            <div class="ball main">@_latestForecast.Ball5</div>
-                            <div class="ball main">@_latestForecast.Ball6</div>
-                            @if (_latestForecast.BonusBall.HasValue)
-                            {
-                                <span style="color:var(--text-dim); font-size:11px;">+</span>
-                                <div class="ball bonus">@_latestForecast.BonusBall</div>
-                            }
-                        </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+                        <span class="badge badge-dim">Draw #@_latestForecast.TargetDrawNumber</span>
+                        <span class="badge badge-gold">@(_latestForecast.ConfidenceScore.ToString("P1")) confidence</span>
+                        @if (_latestForecast.MatchCount.HasValue)
+                        { <span class="badge badge-@(_latestForecast.MatchCount >= 3 ? "green" : "dim")">@_latestForecast.MatchCount matched</span> }
+                        else { <span class="badge badge-dim">Awaiting result</span> }
                     </div>
-
-                    @if (_latestForecast.MatchCount.HasValue)
-                    {
-                        <div class="badge badge-@(_latestForecast.MatchCount >= 3 ? "green" : "dim")">
-                            @_latestForecast.MatchCount matched
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="badge badge-dim">Awaiting draw result</div>
-                    }
+                    <div class="ball-row" style="margin-bottom:12px;">
+                        @foreach (var b in new[]{ _latestForecast.Ball1,_latestForecast.Ball2,_latestForecast.Ball3,
+                                                  _latestForecast.Ball4,_latestForecast.Ball5,_latestForecast.Ball6 })
+                        { <div class="ball main">@b</div> }
+                        @if (_latestForecast.BonusBall.HasValue)
+                        {
+                            <span class="text-dim" style="font-size:11px;align-self:center;">+</span>
+                            <div class="ball bonus">@_latestForecast.BonusBall</div>
+                        }
+                    </div>
+                    <div class="text-dim" style="font-size:11px;">Generated @_latestForecast.GeneratedAt.ToString("dd MMM yyyy · HH:mm")</div>
                 }
             </div>
 
-            <!-- Accuracy trend -->
             <div class="card">
-                <div class="card-header">
-                    <span class="card-title">Accuracy Overview</span>
+                <div class="card-header"><span class="card-title">Intelligence Status</span></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                    <div class="d-aw-item">
+                        <div class="d-aw-label">Self-Awareness</div>
+                        @if (_accuracy?.ShouldRetrain == true)
+                        { <div class="d-aw-val text-danger">⚠ Retrain Signal</div> }
+                        else { <div class="d-aw-val text-success">✓ Stable</div> }
+                    </div>
+                    <div class="d-aw-item">
+                        <div class="d-aw-label">Models</div>
+                        <div class="d-aw-val @(_status?.ModelsLoaded == true ? "text-success" : "text-danger")">
+                            @(_status?.ModelsLoaded == true ? "✓ Loaded" : "✗ Not Loaded")
+                        </div>
+                    </div>
+                    <div class="d-aw-item">
+                        <div class="d-aw-label">Evaluated</div>
+                        <div class="d-aw-val">@(_status?.EvaluatedPredictions ?? 0)</div>
+                    </div>
+                    <div class="d-aw-item">
+                        <div class="d-aw-label">Window</div>
+                        <div class="d-aw-val">@(_accuracy?.Window ?? 20) draws</div>
+                    </div>
                 </div>
-                @if (_accuracy is not null)
-                {
-                    <div style="margin-bottom:20px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-                            <span style="font-size:12px; color:var(--text-secondary);">Rolling accuracy (last @_accuracy.Window)</span>
-                            <span class="text-gold" style="font-size:13px; font-weight:600;">@_accuracy.RollingAccuracy.ToString("F2") / 6</span>
-                        </div>
-                        <div class="progress-track">
-                            <div class="progress-fill" style="width:@(Math.Min(_accuracy.RollingAccuracy / 6.0 * 100, 100).ToString("F0"))%"></div>
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                        <div style="background:var(--bg-panel); border-radius:var(--radius); padding:14px;">
-                            <div class="stat-label">Self-Awareness</div>
-                            @if (_accuracy.ShouldRetrain)
-                            {
-                                <div class="text-danger" style="font-size:13px; font-weight:600; margin-top:4px;">⚠ Retrain needed</div>
-                            }
-                            else
-                            {
-                                <div class="text-success" style="font-size:13px; font-weight:600; margin-top:4px;">✓ Performing well</div>
-                            }
-                        </div>
-                        <div style="background:var(--bg-panel); border-radius:var(--radius); padding:14px;">
-                            <div class="stat-label">Evaluated</div>
-                            <div style="font-size:20px; font-weight:700; color:var(--text-primary); margin-top:4px;">
-                                @(_status?.EvaluatedPredictions ?? 0)
-                            </div>
-                        </div>
-                    </div>
-                }
+                <div class="d-aw-label" style="margin-bottom:6px;">Accuracy Score</div>
+                <div class="progress-track">
+                    <div class="progress-fill" style="width:@(Math.Min((_accuracy?.RollingAccuracy ?? 0)/6.0*100,100).ToString("F0"))%"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:6px;">
+                    <span class="text-dim" style="font-size:11px;">0.00</span>
+                    <span class="text-gold" style="font-size:12px;font-weight:600;">@(_accuracy?.RollingAccuracy.ToString("F2") ?? "0.00") / 6.00</span>
+                </div>
             </div>
         </div>
 
-        <!-- Recent Events -->
         <div class="card">
             <div class="card-header">
                 <span class="card-title">Recent Pattern Events</span>
-                <a href="/events" class="btn btn-outline btn-sm">Manage Events</a>
+                <a href="/events" class="btn btn-outline btn-sm">Manage →</a>
             </div>
             @if (_recentEvents.Count == 0)
             {
                 <div class="empty-state">
-                    <p>No events recorded yet. <a href="/events" class="text-gold">Import data</a> to begin.</p>
+                    <div class="empty-icon">≡</div>
+                    <p>No events yet. <a href="/events" class="text-gold">Import data</a> to begin.</p>
                 </div>
             }
             else
             {
                 <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Draw #</th>
-                            <th>Date</th>
-                            <th>Numbers</th>
-                            <th>Bonus</th>
-                            <th>Sum</th>
-                            <th>Odd/Even</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Draw #</th><th>Date</th><th>Numbers</th><th>Bonus</th><th>Sum</th><th>Odd/Even</th></tr></thead>
                     <tbody>
                         @foreach (var e in _recentEvents)
                         {
                             <tr>
-                                <td class="text-gold">#@e.DrawNumber</td>
-                                <td>@e.DrawDate.ToString("dd MMM yyyy")</td>
+                                <td class="text-gold text-mono">#@e.DrawNumber</td>
+                                <td class="text-muted">@e.DrawDate.ToString("dd MMM yyyy")</td>
                                 <td>
                                     <div class="ball-row">
-                                        @foreach (var b in new[] { e.Ball1, e.Ball2, e.Ball3, e.Ball4, e.Ball5, e.Ball6 })
-                                        {
-                                            <div class="ball main" style="width:30px;height:30px;font-size:11px;">@b</div>
-                                        }
+                                        @foreach (var b in new[]{e.Ball1,e.Ball2,e.Ball3,e.Ball4,e.Ball5,e.Ball6})
+                                        { <div class="ball main" style="width:28px;height:28px;font-size:10px;">@b</div> }
                                     </div>
                                 </td>
-                                <td>
-                                    @if (e.BonusBall.HasValue)
-                                    {
-                                        <div class="ball bonus" style="width:30px;height:30px;font-size:11px;">@e.BonusBall</div>
-                                    }
-                                </td>
-                                <td>@e.Sum</td>
-                                <td><span class="text-gold">@e.OddCount</span> / <span class="text-blue">@e.EvenCount</span></td>
+                                <td>@if(e.BonusBall.HasValue){<div class="ball bonus" style="width:28px;height:28px;font-size:10px;">@e.BonusBall</div>}</td>
+                                <td class="text-muted">@e.Sum</td>
+                                <td><span class="text-gold">@e.OddCount</span><span class="text-dim"> / </span><span class="text-blue">@e.EvenCount</span></td>
                             </tr>
                         }
                     </tbody>
@@ -216,24 +163,29 @@
     }
 </div>
 
+<style>
+    .d-aw-item { background:var(--bg-panel);border-radius:var(--radius);padding:12px;border:1px solid var(--border); }
+    .d-aw-label { font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:5px; }
+    .d-aw-val { font-size:14px;font-weight:600;color:var(--text-primary); }
+</style>
+
 @code {
-    private SystemStatusDto? _status;
-    private ForecastDto? _latestForecast;
-    private AccuracyDto? _accuracy;
+    private SystemStatusDto?      _status;
+    private ForecastDto?          _latestForecast;
+    private AccuracyDto?          _accuracy;
     private List<PatternEventDto> _recentEvents = [];
-    private bool _loading = true;
+    private bool                  _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var tasks = Task.WhenAll(
-                Api.GetSystemStatusAsync().ContinueWith(t => _status = t.Result),
+            await Task.WhenAll(
+                Api.GetSystemStatusAsync().ContinueWith(t  => _status         = t.Result),
                 Api.GetLatestForecastAsync().ContinueWith(t => _latestForecast = t.Result),
-                Api.GetAccuracyAsync().ContinueWith(t => _accuracy = t.Result),
-                Api.GetRecentEventsAsync(10).ContinueWith(t => _recentEvents = t.Result)
+                Api.GetAccuracyAsync().ContinueWith(t       => _accuracy       = t.Result),
+                Api.GetRecentEventsAsync(8).ContinueWith(t  => _recentEvents   = t.Result)
             );
-            await tasks;
         }
         finally { _loading = false; }
     }

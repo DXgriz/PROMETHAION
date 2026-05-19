@@ -11,6 +11,7 @@
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.0" PrivateAssets="all" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0" />
 		<PackageReference Include="Blazored.Toast" Version="4.2.1" />
+		<PackageReference Include="Microsoft.Playwright" Version="1.59.0" />
 	</ItemGroup>
 
 	<ItemGroup>

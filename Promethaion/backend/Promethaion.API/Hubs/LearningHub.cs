@@ -1,23 +1,32 @@
 ﻿using Microsoft.AspNetCore.SignalR;
-using System.Text.RegularExpressions;
 
-namespace Promethaion.API.Hubs
+namespace Promethaion.API.Hubs;
+
+/// <summary>
+/// SignalR hub that broadcasts real-time training and harvest
+/// progress to connected Blazor clients.
+///
+/// Clients connect to /hubs/training and listen for these events:
+///
+///   TrainingStarted(string gameName)
+///   PipelineProgress(string pipelineName, int percent, string message)
+///   TrainingCompleted(object[] metricsArray)
+///   TrainingFailed(string errorMessage)
+///   HarvestStarted(string gameName)
+///   HarvestCompleted(int newRecords, int skipped, int failed)
+/// </summary>
+public class LearningHub : Hub
 {
     /// <summary>
-    /// Broadcasts real-time training progress to connected clients.
-    /// Clients connect to /hubs/training and listen for these events:
-    ///   - TrainingStarted(gameName)
-    ///   - PipelineProgress(pipelineName, percent, message)
-    ///   - TrainingCompleted(metricsJson)
-    ///   - TrainingFailed(errorMessage)
-    ///   - PredictionGenerated(predictionDto)
+    /// Called by the Blazor client to subscribe to updates
+    /// for a specific game (e.g. "SA Lotto").
     /// </summary>
-    public class LearningHub : Hub
-    {
-        public async Task JoinTrainingRoom(string gameName)
+    public async Task JoinLearningRoom(string gameName)
         => await Groups.AddToGroupAsync(Context.ConnectionId, gameName);
 
-        public async Task LeaveTrainingRoom(string gameName)
-            => await Groups.RemoveFromGroupAsync(Context.ConnectionId, gameName);
-    }
+    /// <summary>
+    /// Called by the Blazor client to unsubscribe.
+    /// </summary>
+    public async Task LeaveLearningRoom(string gameName)
+        => await Groups.RemoveFromGroupAsync(Context.ConnectionId, gameName);
 }

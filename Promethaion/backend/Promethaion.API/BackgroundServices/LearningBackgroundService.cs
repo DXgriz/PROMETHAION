@@ -1,111 +1,145 @@
-﻿using Promethaion.Core.Interfaces;
-using Promethaion.ML;
-using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Promethaion.ML.Services;
 using Promethaion.API.Hubs;
+using Promethaion.Core.Interfaces;
+using Promethaion.ML.Services;
 
-namespace Promethaion.API.BackgroundServices
+namespace Promethaion.API.BackgroundServices;
+
+/// <summary>
+/// Handles all ML model training.
+///
+/// Triggered three ways:
+///   1. Via OnHarvestCompleted event (wired in Program.cs) — fires after
+///      new draw data is scraped, training immediately on fresh data.
+///   2. Via hourly self-awareness check — retrains if rolling accuracy
+///      has degraded below the configured threshold.
+///   3. Via RunTrainingCycleAsync() called directly from the API controller
+///      when the user clicks "Train Models" in the UI.
+///
+/// Broadcasts progress to the Blazor Intelligence page via SignalR
+/// using IHubContext so messages reach clients from outside the hub.
+/// </summary>
+public class LearningBackgroundService : BackgroundService
 {
-    /// <summary>
-    /// Hosted background service that:
-    ///   1. Performs an initial training run on startup (if models not loaded).
-    ///   2. Checks the self-awareness engine every hour to see if a retrain is needed.
-    ///   3. Broadcasts progress via SignalR.
-    /// </summary>
-    public class LearningBackgroundService : BackgroundService
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<LearningBackgroundService> _log;
+    private readonly IHubContext<LearningHub> _hub;
+
+    // Prevents two training runs from overlapping.
+    // WaitAsync(0) = non-blocking — if already training, skip silently.
+    private readonly SemaphoreSlim _trainLock = new(1, 1);
+
+    public LearningBackgroundService(
+        IServiceScopeFactory scopeFactory,
+        ILogger<LearningBackgroundService> log,
+        IHubContext<LearningHub> hub)
     {
-        private readonly IServiceScopeFactory _scopeFactory;
-        private readonly ILogger<LearningBackgroundService> _logger;
-        private readonly IHubContext<LearningHub> _hub;
+        _scopeFactory = scopeFactory;
+        _log = log;
+        _hub = hub;
+    }
 
-        // How often to poll the self-awareness engine.
-        private static readonly TimeSpan PollInterval = TimeSpan.FromHours(1);
+    // ── IHostedService ────────────────────────────────────────────────────────
 
-        public LearningBackgroundService(
-            IServiceScopeFactory scopeFactory,
-            ILogger<LearningBackgroundService> logger,
-            IHubContext<LearningHub> hub)
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        // Hourly self-awareness check — retrains if accuracy has drifted.
+        using var timer = new PeriodicTimer(TimeSpan.FromHours(1));
+        while (await timer.WaitForNextTickAsync(ct))
+            await CheckSelfAwarenessAsync("SA Lotto", ct);
+    }
+
+    // ── Public API (called from Program.cs event wire + API controller) ───────
+
+    /// <summary>
+    /// Runs a full training cycle across all three pipelines.
+    /// Broadcasts progress to all connected Blazor clients via SignalR.
+    /// </summary>
+    public async Task RunTrainingCycleAsync(string gameName, CancellationToken ct)
+    {
+        // Non-blocking lock — if a training run is already in progress, skip.
+        if (!await _trainLock.WaitAsync(0))
         {
-            _scopeFactory = scopeFactory;
-            _logger = logger;
-            _hub = hub;
+            _log.LogWarning("[LearningService] Training already in progress — skipping duplicate request.");
+            return;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        try
         {
-            // Brief startup delay to let the web server initialise.
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            _log.LogInformation("[LearningService] Training cycle started for {Game}.", gameName);
 
-            // Initial training on startup.
-            await RunTrainingCycleAsync("SA Lotto", stoppingToken);
+            // Notify all connected Blazor clients that training has started.
+            await _hub.Clients.All.SendAsync("TrainingStarted", gameName, ct);
 
-            // Periodic self-awareness check.
-            using var timer = new PeriodicTimer(PollInterval);
-            while (await timer.WaitForNextTickAsync(stoppingToken))
-            {
-                await CheckAndRetrainAsync("SA Lotto", stoppingToken);
-            }
-        }
-
-        /// <summary>Run a full training cycle unconditionally.</summary>
-        public async Task RunTrainingCycleAsync(string gameName, CancellationToken ct)
-        {
             using var scope = _scopeFactory.CreateScope();
             var draws = scope.ServiceProvider.GetRequiredService<IPatterneventRepository>();
             var trainer = scope.ServiceProvider.GetRequiredService<PipelineTrainer>();
 
-            try
-            {
-                await _hub.Clients.Group(gameName)
-                    .SendAsync("TrainingStarted", gameName, ct);
+            var history = await draws.GetAllAsync(gameName);
 
-                var history = await draws.GetAllAsync(gameName);
-                if (history.Count < 20)
+            if (history.Count < 20)
+            {
+                var msg = $"Only {history.Count} records in DB — need at least 20 to train.";
+                _log.LogWarning("[LearningService] {Msg}", msg);
+                await _hub.Clients.All.SendAsync("TrainingFailed", msg, ct);
+                return;
+            }
+
+            _log.LogInformation("[LearningService] Training on {Count} draw records.", history.Count);
+
+            await _hub.Clients.All.SendAsync(
+                "PipelineProgress", "All", 5,
+                $"Starting — {history.Count} records loaded.", ct);
+
+            var metrics = await trainer.TrainAllAsync(history, ct);
+
+            // Broadcast results to the Intelligence page.
+            await _hub.Clients.All.SendAsync("TrainingCompleted",
+                metrics.Select(m => new
                 {
-                    _logger.LogWarning("Not enough draws ({Count}) to train. Skipping.", history.Count);
-                    return;
-                }
+                    m.PipelineName,
+                    m.ModelVersion,
+                    m.RSquared,
+                    m.MeanAbsoluteError,
+                    m.RootMeanSquaredError,
+                    m.IsBestVersion
+                }), ct);
 
-                await _hub.Clients.Group(gameName)
-                    .SendAsync("PipelineProgress", "All", 0, "Starting training…", ct);
-
-                var metrics = await trainer.TrainAllAsync(history, ct);
-
-                await _hub.Clients.Group(gameName)
-                    .SendAsync("TrainingCompleted", metrics.Select(m => new
-                    {
-                        m.PipelineName,
-                        m.ModelVersion,
-                        m.RSquared,
-                        m.MeanAbsoluteError,
-                        m.IsBestVersion
-                    }), ct);
-
-                _logger.LogInformation("Training cycle completed for {Game}.", gameName);
-            }
-            catch (OperationCanceledException) { /* shutting down */ }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Training cycle failed for {Game}.", gameName);
-                await _hub.Clients.Group(gameName)
-                    .SendAsync("TrainingFailed", ex.Message, ct);
-            }
+            _log.LogInformation(
+                "[LearningService] Training complete — {Count} pipelines trained.", metrics.Count);
         }
-
-        private async Task CheckAndRetrainAsync(string gameName, CancellationToken ct)
+        catch (OperationCanceledException)
         {
-            using var scope = _scopeFactory.CreateScope();
-            var awareness = scope.ServiceProvider.GetRequiredService<IAdaptiveIntelligenceEngine>();
+            _log.LogInformation("[LearningService] Training cancelled.");
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "[LearningService] Training failed.");
+            await _hub.Clients.All.SendAsync("TrainingFailed", ex.Message, ct);
+        }
+        finally
+        {
+            _trainLock.Release();
+        }
+    }
 
-            bool shouldRetrain = await awareness.ShouldRetrainAsync();
-            if (shouldRetrain)
-            {
-                _logger.LogInformation("Self-awareness engine triggered a retrain for {Game}.", gameName);
-                await RunTrainingCycleAsync(gameName, ct);
-            }
+    // ── Self-awareness check ──────────────────────────────────────────────────
+
+    private async Task CheckSelfAwarenessAsync(string gameName, CancellationToken ct)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var awareness = scope.ServiceProvider
+            .GetRequiredService<IAdaptiveIntelligenceEngine>();
+
+        bool shouldRetrain = await awareness.ShouldRetrainAsync();
+        if (shouldRetrain)
+        {
+            _log.LogInformation(
+                "[LearningService] Self-awareness engine triggered retrain for {Game}.", gameName);
+            await RunTrainingCycleAsync(gameName, ct);
         }
     }
 }

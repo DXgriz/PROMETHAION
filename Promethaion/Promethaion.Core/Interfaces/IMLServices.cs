@@ -19,6 +19,8 @@ public interface IAnalysisPipeline
     /// <summary>Predict probability scores for each ball number (1–52).</summary>
     Task<Dictionary<int, double>> ScoreBallsAsync(IReadOnlyList<PatternEvent> history, CancellationToken ct = default);
 
+    Task<(List<int> MainBalls, int BonusBall)> PredictDrawAsync(IReadOnlyList<PatternEvent> history,CancellationToken ct = default);
+    Task<List<(int Ball, double Score)>> PredictTopBallsAsync(IReadOnlyList<PatternEvent> history,CancellationToken ct = default);
     bool IsModelLoaded { get; }
     Task LoadModelAsync(CancellationToken ct = default);
     Task SaveModelAsync(CancellationToken ct = default);
